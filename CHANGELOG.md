@@ -12,6 +12,10 @@
 
 - Layout > Scrolling switches the focused window's workspace to the scrolling layout.
 
+### Tiling
+
+- Restarting restores saved layout order, split ratios, fullscreen state and floating frames for surviving windows on their current native Spaces. Inactive Spaces restore on their next visit. Current rules and layout settings take precedence.
+
 ### Fixes
 
 - Switching more than one workspace away no longer stops on the workspaces in between. Before, macOS briefly activated the app on each one it passed, which put that app into the Cmd-Tab order. Multi-step switches are faster too.

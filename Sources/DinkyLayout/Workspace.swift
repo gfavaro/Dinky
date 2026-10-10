@@ -1,14 +1,14 @@
 import CoreGraphics
 
 /// How new windows are placed in a workspace. Dwindle carries the root's layout mode.
-public enum TilingAlgorithm: Equatable, Sendable {
+public enum TilingAlgorithm: Equatable, Sendable, Codable {
     case dwindle(LayoutMode)
     case fixed(rows: Int, columns: Int, expand: FixedExpansion)
     /// A strip of columns wider than the screen, scrolled to the focused one. See Scrolling.swift.
     case scrolling
 }
 
-public enum FixedExpansion: Equatable, Sendable {
+public enum FixedExpansion: Equatable, Sendable, Codable {
     case rows, columns, accordion
 }
 
