@@ -74,11 +74,19 @@ public enum ResizeDimension: String, Equatable, Sendable {
     case smart, width, height
 }
 
-/// A state for `layout`, as in AeroSpace: a mode, an orientation, both, or floating or tiling for the window.
+/// A state for `layout`, as in AeroSpace: a mode, an orientation, both, or floating or tiling for the window;
+/// or scrolling for its workspace.
 public enum LayoutName: String, Equatable, Sendable {
     case tiles, accordion, horizontal, vertical, auto
     case hTiles = "h_tiles", vTiles = "v_tiles", hAccordion = "h_accordion", vAccordion = "v_accordion"
-    case floating, tiling
+    case floating, tiling, scrolling
+
+    /// The one of `names` to apply to a window `current` describes: the one after the last that describes it,
+    /// wrapping, so a list cycles and two toggle; the first when none does.
+    public static func next(in names: [LayoutName], current: [LayoutName]) -> LayoutName {
+        guard let last = names.lastIndex(where: current.contains) else { return names[0] }
+        return names[(last + 1) % names.count]
+    }
 
     /// The container mode this sets, nil if it leaves the mode alone.
     public var mode: LayoutMode? {

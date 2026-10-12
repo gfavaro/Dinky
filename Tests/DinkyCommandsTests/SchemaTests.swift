@@ -68,6 +68,9 @@ struct SchemaTests {
         padding = 20
         orientation = 'keep'
 
+        [scrolling]
+        column-width = 0.5
+
         [gaps]
         inner.horizontal = 4
         inner.vertical = 6
@@ -107,6 +110,12 @@ struct SchemaTests {
 
         [drag]
         placeholders = false
+
+        [modifiers]
+        alt = 'left'
+        ctrl = 'right'
+        cmd = 'both'
+        shift = 'both'
 
         [hooks]
         startup = 'exec-and-forget true'

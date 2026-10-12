@@ -61,7 +61,7 @@ struct ConfigTests {
         #expect(!config.followAppActivation)
         #expect(!config.floatWindowsWithoutFullscreen)
         assertError("workspaces = 0\n", path: "workspaces", line: 1, contains: "at least 1")
-        assertError("default-layout = 'stack'\n", path: "default-layout", line: 1, contains: "'tiles', 'dwindle', 'accordion', 'fixed'")
+        assertError("default-layout = 'stack'\n", path: "default-layout", line: 1, contains: "'tiles', 'dwindle', 'accordion', 'fixed', 'scrolling'")
     }
 
     @Test func `Workspace layouts`() throws {
@@ -131,6 +131,13 @@ struct ConfigTests {
         let accordion = try Config.parse("[accordion]\npadding = 12\norientation = 'keep'\n").accordion
         #expect(accordion.padding == 12)
         #expect(accordion.orientation == .keep)
+    }
+
+    @Test func scrolling() throws {
+        #expect(Config().scrolling.columnWidth == 0.49)
+        #expect(try Config.parse("[scrolling]\ncolumn-width = 0.5\n").scrolling.columnWidth == 0.5)
+        #expect(try Config.parse("default-layout = 'scrolling'\n").defaultLayout == .scrolling)
+        assertError("[scrolling]\ncolumn-width = 1.5\n", path: "scrolling.column-width", line: 2, contains: "0.1 to 1")
     }
 
     @Test func `Syntax error has line`() {
@@ -284,6 +291,16 @@ struct ConfigTests {
         #expect(!config.drag.placeholders)
         assertError("[animations]\nduration-ms = -1\n", path: "animations.duration-ms", line: 2, contains: "0 to 1000")
         assertError("[drag]\nghost = true\n", path: "drag.ghost", line: 2, contains: "unknown key")
+    }
+
+    @Test func `Modifier sides`() throws {
+        #expect(Config.default.modifiers == ModifierSides())
+        let config = try Config.parse("[modifiers]\nalt = 'left'\nshift = 'right'\n")
+        #expect(config.modifiers.alt == .left)
+        #expect(config.modifiers.ctrl == .both)
+        #expect(config.modifiers.shift == .right)
+        assertError("[modifiers]\nalt = 'up'\n", path: "modifiers.alt", line: 2, contains: "'both', 'left', 'right'")
+        assertError("[modifiers]\nfn = 'left'\n", path: "modifiers.fn", line: 2, contains: "unknown key")
     }
 
     @Test func `Load from missing file fails`() {

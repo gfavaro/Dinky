@@ -16,6 +16,30 @@ extension Coordinator {
         placements[id]?.space.flatMap { workspaces[$0]?.container(of: id) }
     }
 
+    /// Whether a tiled window's workspace is laid out as a scrolling strip.
+    func isScrolling(_ id: WindowID) -> Bool {
+        placements[id]?.space.flatMap { workspaces[$0]?.isScrolling } ?? false
+    }
+
+    /// Whether the window shows whole: false only for a column scrolled partly or wholly out of view.
+    func isInView(_ id: WindowID) -> Bool {
+        placements[id]?.space.flatMap { workspaces[$0]?.isInView(id) } ?? true
+    }
+
+    /// Switches a tiled window's workspace to the scrolling strip, or back to the tree its config gives it
+    /// (tiles when that is scrolling too). The choice holds until switched again.
+    func setScrolling(_ on: Bool, for id: WindowID) {
+        guard let key = placements[id]?.space else { return }
+        let configured = algorithm(settings(for: key))
+        let new: TilingAlgorithm = on ? .scrolling : configured == .scrolling ? .dwindle(.tiles) : configured
+        edit(key) {
+            $0.chosenAlgorithm = new == configured ? nil : new
+            $0.setAlgorithm(new)
+            $0.focus(id)
+        }
+        flush()
+    }
+
     /// The axis the container holding a tiled window runs along now, `auto` resolved.
     func containerAxis(of id: WindowID) -> Orientation? {
         placements[id]?.space.flatMap { workspaces[$0]?.containerAxis(of: id) }

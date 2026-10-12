@@ -20,12 +20,13 @@ $ dinky layout accordion <span class="cursor">█</span></code></pre>
 Latest release: **{{ site.version }}**
 
 dinky tiles the windows on each native Space and switches Spaces in about 70 ms
-instead of half a second. It has an accordion mode, focus borders, a TOML
-config and a `dinky` command line for scripts and bars. Nothing is injected
-into the Dock.
+instead of half a second. It has an accordion mode, a scrolling layout after
+niri and Hyprland, focus borders, a TOML config and a `dinky` command line for
+scripts and bars. Nothing is injected into the Dock.
 
-It is not a compositor: macOS still draws every window. No scrolling layouts;
-windows glide to their tiles by being moved there, frame by frame.
+It is not a compositor: macOS still draws every window. Windows glide to their
+tiles by being moved there, frame by frame, and a column scrolled out of view
+hangs off the display edge, since nothing can clip it.
 
 Status: early, in daily use by its author on macOS 27. Expect rough edges.
 
@@ -76,9 +77,14 @@ once to turn off "When switching to an application, switch to a Space with
 open windows" (Desktop & Dock > Mission Control). With that off, Cmd-Tab and
 Dock clicks switch Spaces the fast way instead of sliding. Saying no is fine.
 
-The menu bar shows the current workspace. Its menu has every command, each with
-the key bound to it in the current mode. `dinky doctor` checks the config and
-the macOS settings dinky depends on.
+The menu bar shows the current workspace. Its menu has the everyday commands
+(workspaces, focus, move, join, resize, layout, displays and modes), each with
+the key bound to it in the current mode, and lists the bindings it doesn't
+cover under Other Key Bindings. `dinky doctor` checks the config and the macOS
+settings dinky depends on.
+
+Turn off "Automatically rearrange Spaces based on most recent use" in the same
+place, or workspace numbers move around; `dinky doctor` warns while it's on.
 
 Run one tiling window manager at a time. With AeroSpace, Amethyst, yabai or
 KiwiDesk also running, each undoes the other's layouts; dinky shows a `!` in the
@@ -86,8 +92,10 @@ menu bar and says which one to quit.
 
 ## Uninstall
 
-Quit dinky, delete the app and `~/.config/dinky`, and remove it from
-Accessibility and Login Items. To get the Cmd-Tab slide back:
+Quit dinky, delete the app, `~/.config/dinky`,
+`~/Library/Application Support/dinky` and `~/Library/Logs/dinky.log`, run
+`defaults delete com.brnbw.dinky`, and remove it from Accessibility and Login
+Items. To get the Cmd-Tab slide back:
 
 ```sh
 defaults write com.apple.dock workspaces-auto-swoosh -bool true && killall Dock

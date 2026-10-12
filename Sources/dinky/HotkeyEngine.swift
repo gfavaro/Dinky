@@ -8,6 +8,7 @@ import Foundation
 final class HotkeyEngine {
     private let onCommands: ([String]) -> Void
     private var modes: [String: [KeyPress: [String]]] = [:]
+    private var sides = ModifierSides()
     private(set) var currentMode = "main"
     var enabled = true
     /// Called with the new mode's name and the previous one whenever the mode changes.
@@ -20,7 +21,8 @@ final class HotkeyEngine {
     }
 
     /// Replaces all bindings and goes back to `main`.
-    func load(modes: [String: Mode]) {
+    func load(modes: [String: Mode], sides: ModifierSides) {
+        self.sides = sides
         self.modes = modes.mapValues { mode in
             Dictionary(uniqueKeysWithValues: mode.bindings.map { (KeyPress($0.key), $0.value) })
         }
@@ -61,7 +63,8 @@ final class HotkeyEngine {
 
     /// The commands bound to this event in the current mode, if dinky should take it.
     fileprivate func commands(for event: CGEvent) -> [String]? {
-        enabled ? modes[currentMode]?[KeyPress(event)] : nil
+        guard enabled, let press = KeyPress(event, sides: sides) else { return nil }
+        return modes[currentMode]?[press]
     }
 
     fileprivate func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {

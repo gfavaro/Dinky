@@ -191,8 +191,23 @@ static CGEventRef dock_swipe_augment(CGEventRef event)
     return augmented;
 }
 
-// mimi mimiCreateAugmentedDockSwipeEvent. sign is +1 toward higher Space indices.
-static CGEventRef mimi_create_event(int phase, double sign)
+// mimi MimiDockSwipeRequiresAugmentation: the Dock reads the IOHID payload from macOS 27 on. Before that it
+// reads the plain CGEvent fields, with the Space-index sign.
+static bool requires_augmentation(void)
+{
+    return NSProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27;
+}
+
+// mimi mimiAugmentedDockSwipeSign: the sign the macOS 27 payload is read with. It runs opposite to the
+// Space-index direction, and the scroll direction setting reverses synthetic swipes too.
+static double augmented_sign(double sign)
+{
+    NSNumber *natural = [NSUserDefaults.standardUserDefaults objectForKey:@"com.apple.swipescrolldirection"];
+    return (natural ? natural.boolValue : true) ? -sign : sign;
+}
+
+// mimi mimiCreateAugmentedDockSwipeEvent. rawSign is the payload's, from augmented_sign.
+static CGEventRef mimi_create_event(int phase, double rawSign)
 {
     CGEventRef event = CGEventCreate(NULL);
     if (!event) return NULL;
@@ -203,14 +218,13 @@ static CGEventRef mimi_create_event(int phase, double sign)
     CGEventSetIntegerValueField(event, kGesturePhase, phase);
     CGEventSetIntegerValueField(event, kGesturePhaseAlias, phase);
 
-    // The payload uses the raw HID sign convention, opposite to the Space-index direction.
-    CGEventSetDoubleValueField(event, kGestureSwipeProgress, -sign);
+    CGEventSetDoubleValueField(event, kGestureSwipeProgress, rawSign);
     CGEventSetDoubleValueField(event, kGestureSwipePositionX, kMimiPositionX);
     CGEventSetDoubleValueField(event, kGestureZoomDeltaY, kMimiZoomDeltaY);
     CGEventSetDoubleValueField(event, kSourceUnixProcessIDAlias, (double)mach_absolute_time());
 
     if (phase == kPhaseEnded) {
-        CGEventSetDoubleValueField(event, kGestureSwipeVelocityX, -sign * kMimiVelocity);
+        CGEventSetDoubleValueField(event, kGestureSwipeVelocityX, rawSign * kMimiVelocity);
     }
 
     CGEventRef augmented = dock_swipe_augment(event);
@@ -218,12 +232,32 @@ static CGEventRef mimi_create_event(int phase, double sign)
     return augmented;
 }
 
-// mimi mimiPostAugmentedDockSwipe.
+// mimi's legacy swipe for macOS before 27: began and ended, the sign and velocity in the CGEvent fields.
+static bool legacy_post_swipe(double sign)
+{
+    CGEventRef event = CGEventCreate(NULL);
+    if (!event) return false;
+    CGEventSetIntegerValueField(event, kEventTypeField, kEventDockControl);
+    CGEventSetIntegerValueField(event, kGestureHIDType, kHIDEventTypeDockSwipe);
+    CGEventSetIntegerValueField(event, kGestureSwipeMotion, kGestureMotionHorizontal);
+    CGEventSetDoubleValueField(event, kGestureSwipeProgress, sign);
+    CGEventSetDoubleValueField(event, kGestureSwipeVelocityX, sign * kMimiVelocity);
+    CGEventSetIntegerValueField(event, kGesturePhase, kPhaseBegan);
+    CGEventPost(kCGSessionEventTap, event);
+    CGEventSetIntegerValueField(event, kGesturePhase, kPhaseEnded);
+    CGEventPost(kCGSessionEventTap, event);
+    CFRelease(event);
+    return true;
+}
+
+// mimi mimiPostAugmentedDockSwipe, or the legacy swipe before macOS 27. sign is +1 toward higher Space indices.
 static bool mimi_post_swipe(double sign)
 {
+    if (!requires_augmentation()) return legacy_post_swipe(sign);
+    double rawSign = augmented_sign(sign);
     static const int phases[] = {kPhaseBegan, kPhaseChanged, kPhaseEnded};
     for (size_t i = 0; i < sizeof(phases) / sizeof(phases[0]); i++) {
-        CGEventRef event = mimi_create_event(phases[i], sign);
+        CGEventRef event = mimi_create_event(phases[i], rawSign);
         if (!event) {
             fprintf(stderr, "switch: failed to build augmented dock swipe event (phase=%d)\n", phases[i]);
             return false;
@@ -253,7 +287,9 @@ static bool cursor_is_on_display(CGDirectDisplayID displayID)
 }
 
 // mimi MimiFocusSpaceUsingGesture, augmented branch. mimi pumps the run loop after every step and
-// once more for count+1 delays at the end; we skip the wait after the last step, Swift polls instead.
+// once more for count+1 delays at the end. We post the steps back to back and let Swift poll for the
+// landing: with a pause between steps the display lands on each Space on the way, and macOS activates
+// the front app there, which puts it into the Cmd-Tab order. Back to back, only the last one counts.
 //
 // The Dock swipes the display under the cursor; nothing in the event or the IOHID payload names a
 // display. So, as mimi, yabai and bobrwm do, warp the cursor to the centre of the target display
@@ -277,12 +313,10 @@ static bool mimi_post_swipes(double sign, int count, CGDirectDisplayID displayID
     }
 
     bool posted = true;
-    for (int i = 0; i < count && posted; i++) {
-        posted = mimi_post_swipe(sign);
-        if (warp || i < count - 1) pump(kMimiStepDelay);  // with a warp, let the last swipe land first
-    }
+    for (int i = 0; i < count && posted; i++) posted = mimi_post_swipe(sign);
 
     if (warp) {
+        pump(kMimiStepDelay);  // let the swipes land before the cursor leaves the display
         CGWarpMouseCursorPosition(restore);
         // A warp holds back real mouse movement for a moment; reattaching the mouse ends that.
         CGAssociateMouseAndMouseCursorPosition(true);

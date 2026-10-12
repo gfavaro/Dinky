@@ -4,6 +4,8 @@ import CoreGraphics
 public enum TilingAlgorithm: Equatable, Sendable, Codable {
     case dwindle(LayoutMode)
     case fixed(rows: Int, columns: Int, expand: FixedExpansion)
+    /// A strip of columns wider than the screen, scrolled to the focused one. See Scrolling.swift.
+    case scrolling
 }
 
 public enum FixedExpansion: Equatable, Sendable, Codable {
@@ -31,6 +33,16 @@ public struct Workspace: Equatable, Sendable {
     public var fullscreen: WindowID? { isFullscreen ? focused : nil }
     /// Sizes windows refused to go below. Tiles grow to them when their siblings can give the space.
     public var minimumSizes: [WindowID: CGSize] = [:]
+    /// Scrolling: the width of a new column, as a share of the width inside the outer gaps.
+    public var columnWidth = 0.5
+    /// Scrolling: each window's column width, as a share. Every window of a column has its column's width.
+    var columnWidths: [WindowID: Double] = [:]
+    /// Scrolling: how far the strip is scrolled, in points from its start. The layout clamps it.
+    var scrollOffset: CGFloat = 0
+    /// Scrolling: the edges of `bounds` with another display beyond them, where a window cannot hang over.
+    public var walls: Set<Direction> = []
+    /// The algorithm a `layout` command switched to, kept over the config's. Nil follows the config.
+    public var chosenAlgorithm: TilingAlgorithm?
 
     /// An empty workspace laid out by `algorithm`. A dwindle accordion root with `autoOrientAccordions` starts
     /// `auto`, as a container switched to accordion would, so it runs top to bottom on a tall display.
@@ -47,6 +59,8 @@ public struct Workspace: Equatable, Sendable {
         case .fixed(let rows, let columns, _):
             precondition(rows > 0 && columns > 0)
             root = Self.fixedRoot(rows: rows, columns: columns)
+        case .scrolling:
+            root = Container(.horizontal)
         }
     }
 
@@ -64,6 +78,10 @@ public struct Workspace: Equatable, Sendable {
             root = Self.fixedRoot(rows: rows, columns: columns)
         }
         if case .fixed(_, _, let expansion) = algorithm, insertIntoFixed(id, expand: expansion) {
+            return focus(id)
+        }
+        if isScrolling {
+            insertColumn(id)
             return focus(id)
         }
         guard let focused, let path = root.path(of: focused) else {
@@ -99,6 +117,7 @@ public struct Workspace: Equatable, Sendable {
         if windows.isEmpty, case .fixed(let rows, let columns, _) = algorithm {
             root = Self.fixedRoot(rows: rows, columns: columns)
         }
+        columnWidths[id] = nil
         if focused == id {
             isFullscreen = false
             focused = nil
@@ -218,6 +237,9 @@ public struct Workspace: Equatable, Sendable {
         case .fixed(let rows, let columns, let expand):
             root = Self.fixedRoot(rows: rows, columns: columns)
             for id in ids { _ = insertIntoFixed(id, expand: expand) }
+        case .scrolling:
+            root = Container(.horizontal, .tiles, ids.map(Node.window))
+            for id in ids { columnWidths[id] = columnWidths[id] ?? columnWidth }
         }
         if let focused { focus(focused) }
     }
@@ -229,6 +251,7 @@ public struct Workspace: Equatable, Sendable {
         root.modify(at: Array(path.dropLast())) { $0.replace(at: path.last!, with: .window(new)) }
         if focused == old { focused = new }
         minimumSizes[old] = nil
+        columnWidths[new] = columnWidths.removeValue(forKey: old)
     }
 
     /// Undo every tree edit: the windows go back into the configured layout, in order, with equal ratios.
@@ -246,6 +269,7 @@ public struct Workspace: Equatable, Sendable {
         for depth in path.indices {
             root.modify(at: Array(path.prefix(depth))) { $0.active = path[depth] }
         }
+        reveal(id)
     }
 
     /// Focus the neighbour in `direction`. At the edge, `wrapping` focuses the window at the opposite edge
@@ -300,6 +324,8 @@ public struct Workspace: Equatable, Sendable {
     public mutating func balanceSizes() {
         isFullscreen = false
         root.balance()
+        for id in columnWidths.keys { columnWidths[id] = columnWidth }
+        if let focused { reveal(focused) }
     }
 
     /// The window's parent container, nil if the window is not here.
@@ -339,7 +365,8 @@ public struct Workspace: Equatable, Sendable {
     /// an accordion turns `auto` unless a command chose its orientation.
     public mutating func setLayout(_ mode: LayoutMode?, _ orientation: ContainerOrientation?) {
         isFullscreen = false
-        guard let focused, let path = root.path(of: focused) else { return }
+        // The strip itself stays a row of columns; a window alone in its column has no container to change.
+        guard let focused, let path = root.path(of: focused), !(isScrolling && path.count == 1) else { return }
         root.modify(at: Array(path.dropLast())) { c in
             if let mode {
                 if mode == .accordion, c.mode != .accordion, autoOrientAccordions, !c.orientationChosen { c.orientation = .auto }
@@ -359,8 +386,10 @@ public struct Workspace: Equatable, Sendable {
     }
 
     /// Frames and stacking for every window. A fullscreen window covers the bounds minus outer gaps and comes first.
+    /// Scrolled-out windows are parked where macOS lets them be, see `parked(_:)`.
     public func layout() -> Layout {
         var result = tiledLayout()
+        if isScrolling { result.frames = result.frames.mapValues(parked) }
         if let fullscreen {
             result.frames[fullscreen] = gaps.inset(bounds)
             result.order = [fullscreen] + result.order.filter { $0 != fullscreen }
@@ -370,6 +399,7 @@ public struct Workspace: Equatable, Sendable {
 
     /// The layout ignoring fullscreen, used for geometry questions.
     func tiledLayout() -> Layout {
+        if isScrolling { return stripLayout() }
         var result = Layout()
         root.layout(in: gaps.inset(bounds), gaps: gaps, padding: accordionPadding, minimums: minimumSizes, into: &result)
         return result
@@ -378,6 +408,7 @@ public struct Workspace: Equatable, Sendable {
     /// Tidy the tree after an edit, and unwrap a root whose only child is a container.
     mutating func normalize() {
         root.normalize()
-        if root.children.count == 1, case .container(let only) = root.children[0] { root = only }
+        // The strip stays the root even with one column left.
+        if !isScrolling, root.children.count == 1, case .container(let only) = root.children[0] { root = only }
     }
 }

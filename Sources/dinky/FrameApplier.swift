@@ -91,7 +91,12 @@ final class FrameApplier {
     /// Raise overlapping windows into the layout's order if they are not, as `apply` does after writing.
     func raiseIntoOrder(_ layout: Layout, pids: [WindowID: pid_t], front: WindowID?, then done: @escaping () -> Void = {}) {
         raiseQueue.async {
-            let ids = layout.raises(current: onScreenOrder())
+            var ids = layout.raises(current: onScreenOrder())
+            // Raising makes a window its app's key window, so the front window goes last when its app had another
+            // raised: it overlaps nothing (a column in view of a scrolling strip) and would lose focus otherwise.
+            if let front, ids.last != front, let pid = pids[front], ids.contains(where: { pids[$0] == pid }) {
+                ids = ids.filter { $0 != front } + [front]
+            }
             if Self.raisingKeepsFocus(ids, front: front, pids: pids) { self.raise(ids, pids: pids) }
             done()
         }

@@ -189,10 +189,10 @@ private func follow(_ pid: pid_t, name: String) {
     noteFollow(text)
 }
 
-// macOS activates an app on every Space a swipe passes and on the one it lands on, and the arrival rule takes the
-// first of those for its own. One of them can leave another app in front of the one the user chose: one whose window
-// is on top there, or one picked on a Space passed on the way that also has a window here. Focus the window once
-// the display is on its Space.
+// macOS activates an app on the Space a swipe lands on, and on any Space a retargeted switch stopped on, and the
+// arrival rule takes the first of those for its own. One of them can leave another app in front of the one the user
+// chose: one whose window is on top there, or one picked on a Space passed on the way that also has a window here.
+// Focus the window once the display is on its Space.
 private func bringForward(_ window: UInt32, of pid: pid_t, name: String) {
     guard NSWorkspace.shared.frontmostApplication?.processIdentifier != pid || frontWindowID() != window else { return }
     log("activate \(name): brought its window forward after the switch")

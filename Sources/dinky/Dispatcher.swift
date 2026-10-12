@@ -200,22 +200,29 @@ enum Dispatcher {
         }
     }
 
-    /// Applies the first layout that does not describe the window now, or the first if all do:
-    /// floating or tiling for the window, a mode, an orientation or both for its container (tiling it first if it floats).
+    /// Applies the layout after the last that describes the window now (see `LayoutName.next`): floating or tiling
+    /// for the window, scrolling for its workspace, a mode, an orientation or both for its container, which takes a
+    /// scrolling workspace back to its tree. Anything but floating tiles a floating window first.
     private static func layout(_ names: [LayoutName], window: WindowID?) -> Reply {
         guard let coordinator = AppState.shared.coordinator else { return .error("tiling is not running") }
         let id = window ?? coordinator.focusedWindow
         guard let floating = coordinator.isFloating(id) else { return .error("layout: no window dinky manages is focused") }
         var current: [LayoutName] = floating ? [.floating] : [.tiling]
-        if !floating, let container = coordinator.container(of: id), let axis = coordinator.containerAxis(of: id) {
+        if !floating, coordinator.isScrolling(id) {
+            current.append(.scrolling)
+        } else if !floating, let container = coordinator.container(of: id), let axis = coordinator.containerAxis(of: id) {
             current += LayoutName.describing(container.mode, axis: axis, auto: container.orientation == .auto)
         }
-        let name = names.first { !current.contains($0) } ?? names[0]
+        let name = LayoutName.next(in: names, current: current)
         switch name {
         case .floating, .tiling:
             coordinator.setFloating(id, name == .floating)
+        case .scrolling:
+            if floating { coordinator.setFloating(id, false) }
+            coordinator.setScrolling(true, for: id)
         default:
             if floating { coordinator.setFloating(id, false) }
+            if coordinator.isScrolling(id) { coordinator.setScrolling(false, for: id) }
             coordinator.command(on: id) { $0.setLayout(name.mode, name.orientation) }
         }
         return .ok("layout \(name.rawValue)")

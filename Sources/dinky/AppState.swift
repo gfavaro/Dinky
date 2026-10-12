@@ -37,7 +37,7 @@ final class AppState {
     private var watcher: ConfigWatcher?
 
     private init() {
-        hotkeys.load(modes: config.modes)
+        hotkeys.load(modes: config.modes, sides: config.modifiers)
     }
 
     /// Loads `~/.config/dinky/dinky.toml`, writing the default config there first if it is missing.
@@ -101,7 +101,7 @@ final class AppState {
         case .success(let config):
             self.config = config
             configError = nil
-            hotkeys.load(modes: config.modes)
+            hotkeys.load(modes: config.modes, sides: config.modifiers)
             // At launch the app arranges the workspaces itself, once the coordinator has started.
             if let coordinator {
                 coordinator.update(config: config)

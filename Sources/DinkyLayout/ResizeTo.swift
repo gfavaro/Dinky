@@ -17,7 +17,13 @@ extension Workspace {
             guard let frame = tiledLayout().frames[id] else { return false }
             let delta = axis == .horizontal ? size.width - frame.width : size.height - frame.height
             guard abs(delta) >= 0.5 else { continue }
-            if resize(id, by: delta, along: axis, edge: edges.first { $0.orientation == axis }) { changed = true }
+            if isScrolling, axis == .horizontal, let column = root.path(of: id)?.first, root.children.count > 1 {
+                // The column takes the width; its neighbours keep theirs and move along.
+                let area = stripArea, share = Double((columnSpans(in: area)[column].width + delta) / area.width)
+                setWidth(ofColumn: column, share)
+                reveal(id)
+                changed = true
+            } else if resize(id, by: delta, along: axis, edge: edges.first { $0.orientation == axis }) { changed = true }
         }
         return changed
     }

@@ -25,7 +25,7 @@ permalink: /configuration/
 |---|---|---|
 | `start-at-login` | `true` | Register as a login item. |
 | `workspaces` | `5` | Workspaces across all displays, one native Space each. dinky creates and removes Spaces to match. |
-| `default-layout` | `'tiles'` | `'tiles'` (the existing dwindle layout), `'dwindle'`, `'accordion'`, or `'fixed'`. |
+| `default-layout` | `'tiles'` | `'tiles'` (the existing dwindle layout), `'dwindle'`, `'accordion'`, `'fixed'`, or `'scrolling'`. |
 | `default-tiling` | `true` | Set `false` to leave workspaces untiled unless overridden. |
 | `follow-app-activation` | `true` | Cmd-Tab and Dock clicks switch Spaces the fast way. Needs the macOS "switch to a Space with open windows" setting off. |
 | `float-windows-without-fullscreen` | `true` | Float windows that can't go full screen, such as Finder's copy progress, About This Mac and Calculator. Terminals and editors that can hide their title bar still tile. A `layout tiling` rule tiles a window anyway. |
@@ -34,8 +34,21 @@ permalink: /configuration/
 
 ## `[workspace.<number>]`
 
-Override `default-tiling` or `default-layout` for a globally numbered
-workspace. `layout = 'fixed'` reserves every cell in its template from the start.
+Override the top-level `default-tiling` and `default-layout` for a globally
+numbered workspace.
+
+<div class="wide-table" markdown="1">
+
+| Key | Default | |
+|---|---|---|
+| `tiling` | `default-tiling` | Whether the workspace tiles. |
+| `layout` | `default-layout` | Its layout, with the same values. |
+| `columns`, `rows` | `1` | A fixed layout's template. |
+| `expand` | `'columns'` | What a fixed layout does when every cell is taken. |
+
+</div>
+
+ `layout = 'fixed'` reserves every cell in its template from the start.
 `rows` and `columns` each default to `1`; with two columns and three rows, one
 window occupies one sixth of the workspace, and an empty cell stays empty when
 another window closes. New windows fill holes first, left to right, top to bottom.
@@ -65,10 +78,56 @@ app-id = 'com.mitchellh.ghostty'
 run = 'move-window-to-workspace 2'
 ```
 
-`rows`, `columns`, and `expand` apply only to a fixed layout. `layout = 'accordion'`
+`rows`, `columns`, and `expand` are only allowed with a fixed layout; with any
+other they are a config error. `layout = 'accordion'`
 remains available; conceptually it resembles a 1×1 fixed template with accordion
 overflow, but keeps the existing accordion orientation behavior. Workspace
 numbering starts at 1.
+
+## Scrolling
+
+`layout = 'scrolling'` lays a workspace out as a row of columns that runs past
+the edges of the display, as niri and Hyprland's scrolling layout do. Each new
+window opens as a column right of the focused one, `column-width` wide whatever
+the number of columns. A lone column fills the display; columns that fit are
+centred; focusing a column scrolls just far enough to show it whole.
+
+macOS can't hide part of another app's window, so a column scrolled out of view
+is parked: it hangs off the display edge with a sliver of at least 25 points
+left on, an inner gap from the columns in view. Where another display sits beyond that edge, the column stops
+at the border instead and waits behind the columns in view.
+
+Commands work on columns. `focus left` and `right` move between columns, `up`
+and `down` within one. `move left` and `right` swap the column with its
+neighbour, or take a window that shares its column out into a new column.
+`join-with left` and `right` put the window into the neighbouring column.
+`resize width` (and `smart`) changes the column's width, `resize height` the
+window's share of its column; `balance-sizes` resets them all. Hover focus
+leaves columns that are not wholly in view alone; a click scrolls to them.
+
+```toml
+[workspace.1]
+layout = 'scrolling'
+```
+
+`layout scrolling` switches the focused window's workspace to scrolling on the fly, and
+`layout tiles` or `accordion` switches it back to its tree. The switch holds
+until you switch again. To cycle all three on one key:
+
+```toml
+[mode.main]
+ctrl-alt-cmd-s = 'layout tiles accordion scrolling'
+```
+
+## `[scrolling]`
+
+<div class="wide-table" markdown="1">
+
+| Key | Default | |
+|---|---|---|
+| `column-width` | `0.49` | A new column's width, as a share of the display inside the outer gaps, from `0.1` to `1`. Omarchy's `0.49` fits two columns side by side. |
+
+</div>
 
 ## `[accordion]`
 
@@ -162,11 +221,32 @@ gaps.outer.top = 44
 
 ## `[drag]`
 
+Drag a tiled window's edge to resize it; the other tiles make room, and in the
+scrolling layout its column takes the new width. Drag the window itself and
+drop it on another tile to swap the two; dropped anywhere else, it goes back.
+
 <div class="wide-table" markdown="1">
 
 | Key | Default | |
 |---|---|---|
 | `placeholders` | `true` | While you drag a tiled window, outline the tile it came from and the tile it will swap with. |
+
+</div>
+
+## `[modifiers]`
+
+Which key of each modifier pair a binding's modifier means. Limit `alt` to one
+side and the other Option key types special characters as usual: with
+`alt = 'left'`, left Option-h focuses left and right Option-h types `˙`.
+
+<div class="wide-table" markdown="1">
+
+| Key | Default | |
+|---|---|---|
+| `alt` | `'both'` | `'both'`, `'left'` or `'right'`: which Option key is `alt` in bindings. |
+| `ctrl` | `'both'` | The same for Control. |
+| `cmd` | `'both'` | The same for Command. |
+| `shift` | `'both'` | The same for Shift. |
 
 </div>
 
@@ -180,22 +260,27 @@ environment `exec-and-forget` gets.
 | Key | Runs |
 |---|---|
 | `startup` | Once, after dinky has read the windows and displays. |
-| `workspace-changing` | When a dinky switch starts, before it lands. |
+| `workspace-changing` | When a dinky switch starts, before it lands, and again when a burst of switches changes the target. |
 | `workspace-changed` | When a display's workspace changes, or a switch gives up. |
 | `focus-changed` | When focus changes, debounced 50 ms. |
-| `mode-changed` | When the binding mode changes. Sets `DINKY_MODE` and `DINKY_PREV_MODE`. |
+| `mode-changed` | When the binding mode changes, including back to `main` when the config reloads. Sets `DINKY_MODE` and `DINKY_PREV_MODE`. |
 
 </div>
 
 ## `[[rules]]`
 
 Every rule whose conditions all match a new window runs, in order. Dialogs,
-sheets, panels and fixed-size windows float without one, as do windows that
-can't go full screen while `float-windows-without-fullscreen` is on.
+sheets, panels and fixed-size windows always float. Windows that can't go full
+screen float too while `float-windows-without-fullscreen` is on, unless a
+`layout tiling` rule tiles them.
+
+A rule that is exactly `layout floating` or `layout tiling` decides before the
+window is placed, the last one winning. Every other rule command runs once the
+window is placed, on that window.
 
 New windows open on the focused display, whichever display the app picked. A
-rule that runs a command other than `layout` for a window, such as
-`move-window-to-workspace`, decides where it goes instead.
+rule that moves the window, such as `move-window-to-workspace`, decides where
+it goes instead.
 
 <div class="wide-table" markdown="1">
 
@@ -233,7 +318,8 @@ Modifiers (`alt`, `ctrl`, `cmd`, `shift`) and one key, joined by `-`:
 - `keypad-0`–`keypad-9`, `keypad-clear` `keypad-decimal` `keypad-divide`
   `keypad-enter` `keypad-equal` `keypad-minus` `keypad-multiply` `keypad-plus`
 
-The default `alt-` bindings take over Option-letter characters.
+The default `alt-` bindings take over Option-letter characters; set
+`[modifiers] alt = 'left'` to keep right Option for typing them.
 
 ## Default config
 
@@ -245,7 +331,7 @@ The default `alt-` bindings take over Option-letter characters.
 
 start-at-login = true
 workspaces = 5                  # across all displays, one native Space each
-default-layout = 'tiles'        # tiles (dwindle) | dwindle | accordion | fixed
+default-layout = 'tiles'        # tiles (dwindle) | dwindle | accordion | fixed | scrolling
 default-tiling = true           # false leaves workspaces untiled unless overridden
 follow-app-activation = true    # Cmd-Tab and Dock clicks switch Spaces the fast way
 float-windows-without-fullscreen = true   # progress windows, About, Calculator and the like float
@@ -263,6 +349,9 @@ float-windows-without-fullscreen = true   # progress windows, About, Calculator 
 [accordion]
 padding = 30                    # points the neighbours peek out by
 orientation = 'auto'            # auto: run along the container's longer side | keep
+
+[scrolling]
+column-width = 0.49             # a new column's share of the display; a lone column fills it
 
 [gaps]
 inner = 8                       # or { horizontal = 8, vertical = 8 }
@@ -297,8 +386,16 @@ duration-ms = 150               # roughly how long a window takes to arrive
 [drag]
 placeholders = true             # outline where a dragged tile came from and the tile it will swap with
 
-# dinky commands run on events. exec-and-forget gets $DINKY_WORKSPACE, $DINKY_PREV_WORKSPACE, $DINKY_DISPLAY,
-# and $DINKY_MODE, $DINKY_PREV_MODE in mode-changed.
+# Which key of each pair bindings answer to: both | left | right. With alt = 'left',
+# right Option still types special characters.
+[modifiers]
+alt = 'both'
+ctrl = 'both'
+cmd = 'both'
+shift = 'both'
+
+# dinky commands run on events. exec-and-forget gets $DINKY_WORKSPACE, $DINKY_PREV_WORKSPACE and $DINKY_DISPLAY
+# in the workspace hooks, and $DINKY_MODE, $DINKY_PREV_MODE in mode-changed.
 # [hooks]
 # startup = ['exec-and-forget brew services restart sketchybar']
 # workspace-changed = ['exec-and-forget sketchybar --trigger workspace_change']

@@ -10,7 +10,7 @@ extension Config {
 
     start-at-login = true
     workspaces = 5                  # across all displays, one native Space each
-    default-layout = 'tiles'        # tiles (dwindle) | dwindle | accordion | fixed
+    default-layout = 'tiles'        # tiles (dwindle) | dwindle | accordion | fixed | scrolling
     default-tiling = true           # false leaves workspaces untiled unless overridden
     follow-app-activation = true    # Cmd-Tab and Dock clicks switch Spaces the fast way
     float-windows-without-fullscreen = true   # progress windows, About, Calculator and the like float
@@ -28,6 +28,9 @@ extension Config {
     [accordion]
     padding = 30                    # points the neighbours peek out by
     orientation = 'auto'            # auto: run along the container's longer side | keep
+
+    [scrolling]
+    column-width = 0.49             # a new column's share of the display; a lone column fills it
 
     [gaps]
     inner = 8                       # or { horizontal = 8, vertical = 8 }
@@ -62,8 +65,16 @@ extension Config {
     [drag]
     placeholders = true             # outline where a dragged tile came from and the tile it will swap with
 
-    # dinky commands run on events. exec-and-forget gets $DINKY_WORKSPACE, $DINKY_PREV_WORKSPACE, $DINKY_DISPLAY,
-    # and $DINKY_MODE, $DINKY_PREV_MODE in mode-changed.
+    # Which key of each pair bindings answer to: both | left | right. With alt = 'left',
+    # right Option still types special characters.
+    [modifiers]
+    alt = 'both'
+    ctrl = 'both'
+    cmd = 'both'
+    shift = 'both'
+
+    # dinky commands run on events. exec-and-forget gets $DINKY_WORKSPACE, $DINKY_PREV_WORKSPACE and $DINKY_DISPLAY
+    # in the workspace hooks, and $DINKY_MODE, $DINKY_PREV_MODE in mode-changed.
     # [hooks]
     # startup = ['exec-and-forget brew services restart sketchybar']
     # workspace-changed = ['exec-and-forget sketchybar --trigger workspace_change']

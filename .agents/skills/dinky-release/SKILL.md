@@ -24,6 +24,10 @@ command, flag, config key, default, and error, search `docs/index.md`, `docs/com
 update `docs/schemas/dinky.json` and agree with `Sources/DinkyConfig/DefaultConfig.swift`. Removed or
 renamed config must be documented with what to write instead.
 
+Docs come before the changelog and before approval: don't draft release notes for a change the manual
+doesn't describe yet. Commit doc fixes along with the changelog, and in the approval question list
+each doc page you checked and what you changed on it (or "no change needed"), so the review is visible.
+
 Run `just test`. For risky window, Space, or display changes, the Tart VM fuzz (`just fuzz`) and a
 manual smoke check are optional tools, not publication requirements.
 

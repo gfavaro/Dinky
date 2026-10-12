@@ -176,7 +176,21 @@ final class Coordinator {
             guard let display = displays.display(containingSpace: key) else { continue }
             workspaces[key]!.bounds = display.visibleArea
             workspaces[key]!.gaps = gaps(on: display)
+            workspaces[key]!.walls = walls(of: display)
         }
+    }
+
+    /// The sides of a display with another display right against them, which a scrolled-out window must not
+    /// hang over.
+    private func walls(of display: Display) -> Set<Direction> {
+        let frame = display.frame
+        var walls: Set<Direction> = []
+        for other in displays.displays where other.uuid != display.uuid
+            && min(other.frame.maxY, frame.maxY) > max(other.frame.minY, frame.minY) {
+            if abs(other.frame.maxX - frame.minX) < 1 { walls.insert(.left) }
+            if abs(other.frame.minX - frame.maxX) < 1 { walls.insert(.right) }
+        }
+        return walls
     }
 
     /// Carries a Space's tree to another Space, before its windows are moved there, so they arrive in the layout
@@ -186,6 +200,7 @@ final class Coordinator {
               var tree = workspaces.removeValue(forKey: from) else { return }
         tree.bounds = display.visibleArea
         tree.gaps = gaps(on: display)
+        tree.walls = walls(of: display)
         workspaces[to] = tree
         for (id, placement) in placements where placement.space == from { placements[id]!.space = to }
     }
@@ -195,7 +210,8 @@ final class Coordinator {
         for key in workspaces.keys {
             workspaces[key]!.accordionPadding = CGFloat(config.accordion.padding)
             workspaces[key]!.autoOrientAccordions = config.accordion.orientation == .auto
-            workspaces[key]!.setAlgorithm(algorithm(settings(for: key)))
+            workspaces[key]!.columnWidth = config.scrolling.columnWidth
+            workspaces[key]!.setAlgorithm(workspaces[key]!.chosenAlgorithm ?? algorithm(settings(for: key)))
         }
     }
 
@@ -204,11 +220,11 @@ final class Coordinator {
     }
 
     /// The settings of the Space's workspace, by its current number.
-    private func settings(for space: UInt64) -> WorkspaceSettings {
+    func settings(for space: UInt64) -> WorkspaceSettings {
         config.settings(forWorkspace: AppState.shared.numbers.number(of: space))
     }
 
-    private func algorithm(_ settings: WorkspaceSettings) -> TilingAlgorithm {
+    func algorithm(_ settings: WorkspaceSettings) -> TilingAlgorithm {
         let expand: FixedExpansion = switch settings.expand {
         case .rows: .rows
         case .columns: .columns
@@ -218,6 +234,7 @@ final class Coordinator {
         case .tiles, .dwindle: .dwindle(.tiles)
         case .accordion: .dwindle(.accordion)
         case .fixed: .fixed(rows: settings.rows, columns: settings.columns, expand: expand)
+        case .scrolling: .scrolling
         }
     }
 
@@ -310,6 +327,8 @@ final class Coordinator {
                                         accordionPadding: CGFloat(config.accordion.padding),
                                         autoOrientAccordions: config.accordion.orientation == .auto,
                                         algorithm: algorithm(settings))
+            workspaces[key]!.columnWidth = config.scrolling.columnWidth
+            workspaces[key]!.walls = walls(of: display)
         }
         return key
     }

@@ -51,6 +51,18 @@ struct ParseTests {
         #expect(try parse("layout accordion horizontal vertical") == .layout([.accordion, .horizontal, .vertical]))
         #expect(try parse("layout h_tiles v_tiles h_accordion v_accordion") == .layout([.hTiles, .vTiles, .hAccordion, .vAccordion]))
         #expect(try parse("layout floating h_accordion auto") == .layout([.floating, .hAccordion, .auto]))
+        #expect(try parse("layout tiles accordion scrolling") == .layout([.tiles, .accordion, .scrolling]))
+    }
+
+    @Test func `Several layouts cycle from the last that describes the window`() {
+        let cycle: [LayoutName] = [.tiles, .accordion, .scrolling]
+        #expect(LayoutName.next(in: cycle, current: [.tiling, .tiles, .horizontal, .hTiles]) == .accordion)
+        #expect(LayoutName.next(in: cycle, current: [.tiling, .accordion, .horizontal, .hAccordion]) == .scrolling)
+        #expect(LayoutName.next(in: cycle, current: [.tiling, .scrolling]) == .tiles)
+        #expect(LayoutName.next(in: cycle, current: [.floating]) == .tiles, "none describes it")
+        #expect(LayoutName.next(in: [.floating, .tiling], current: [.tiling, .tiles]) == .floating)
+        #expect(LayoutName.next(in: [.floating, .tiling], current: [.floating]) == .tiling)
+        #expect(LayoutName.next(in: [.accordion], current: [.tiling, .accordion]) == .accordion)
     }
 
     @Test func `Layout names set mode, orientation or both`() {

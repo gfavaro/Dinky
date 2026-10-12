@@ -40,10 +40,14 @@ extension Workspace {
     /// Move the focused window one step in `direction`, AeroSpace style: swap with a sibling window, enter a
     /// sibling container, or leave the container at its edge. At the workspace edge, wraps the root in a new
     /// container along that axis, so a window leaves a root accordion for a tile beside it; if the root already
-    /// tiles that way, does nothing.
+    /// tiles that way, does nothing. The scrolling layout moves columns instead, see `moveInStrip`.
     @discardableResult
     public mutating func move(_ direction: Direction) -> Bool {
         isFullscreen = false
+        return isScrolling ? moveInStrip(direction) : moveInTree(direction)
+    }
+
+    mutating func moveInTree(_ direction: Direction) -> Bool {
         guard let focused, let path = root.path(of: focused) else { return false }
         if case .fixed = algorithm, isFixedTree {
             let (column, row) = switch direction {
@@ -81,7 +85,7 @@ extension Workspace {
             var outer = Array(path.prefix(depth + 1))
             detach(path, adjusting: &outer)
             root.modify(at: Array(outer.dropLast())) { $0.insert(.window(focused), at: outer.last! + (forward ? 1 : 0)) }
-        } else if axisOfContainer(at: [], in: layout) != axis || (root.mode == .accordion && root.children.count > 1) {
+        } else if !isScrolling, axisOfContainer(at: [], in: layout) != axis || (root.mode == .accordion && root.children.count > 1) {
             root.modify(at: parentPath) { $0.remove(at: index) }
             root = Container(ContainerOrientation(axis), .tiles, [.container(root)])
             root.insert(.window(focused), at: forward ? 1 : 0)
@@ -98,6 +102,10 @@ extension Workspace {
     @discardableResult
     public mutating func join(_ direction: Direction) -> Bool {
         isFullscreen = false
+        return isScrolling ? joinInStrip(direction) : joinInTree(direction)
+    }
+
+    mutating func joinInTree(_ direction: Direction) -> Bool {
         guard let focused, let path = root.path(of: focused) else { return false }
         let forward = direction.isForward, offset = forward ? 1 : -1, layout = tiledLayout()
         guard let depth = path.indices.last(where: { depth in
@@ -125,9 +133,11 @@ extension Workspace {
     /// or the nearest one running along `axis` if given. Siblings give or take space proportionally; no share
     /// drops below `minimumRatio` and the window does not shrink below its minimum size. False when nothing
     /// visibly changed.
+    /// In the scrolling layout, a width or smart resize changes the column's width.
     @discardableResult
     public mutating func resize(by delta: CGFloat, along axis: Orientation? = nil) -> Bool {
         isFullscreen = false
+        if isScrolling, axis != .vertical { return resizeColumn(by: delta) }
         guard let focused, var path = root.path(of: focused) else { return false }
         let layout = tiledLayout()
         while let index = path.popLast() {
