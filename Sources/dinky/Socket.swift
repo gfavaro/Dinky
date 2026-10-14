@@ -1,10 +1,11 @@
+import DinkyConfig
 import Foundation
 
 // The CLI talks to the app over a unix socket at $TMPDIR/dinky.sock (the per-user temp dir, the same
 // for the app and a shell). One request per connection: the client writes a command line ending in
 // "\n"; the app answers "ok\n" or "error\n" followed by the reply text, then closes the connection.
 
-let socketPath = (NSTemporaryDirectory() as NSString).appendingPathComponent("dinky.sock")
+let socketPath = (NSTemporaryDirectory() as NSString).appendingPathComponent("\(AppIdentity.command).sock")
 
 /// Listens on `socketPath` and answers each request with `handle`, which runs on the main queue.
 /// Nil if the socket can't be set up. A stale socket file from a dinky that did not quit cleanly is replaced.

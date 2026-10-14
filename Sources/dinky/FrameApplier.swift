@@ -1,3 +1,4 @@
+import DinkyConfig
 import AppKit
 import DinkyLayout
 import DinkyPrivate
@@ -22,7 +23,7 @@ final class FrameApplier {
     private var appMinimums: [String: CGSize] = [:]
     private let raiseQueue = DispatchQueue(label: "dinky.frames.raise")
     private static let minimumsURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("dinky/minimum-sizes.json")
+        .appendingPathComponent("\(AppIdentity.directory)/minimum-sizes.json")
 
     init() {
         appMinimums = Self.loadMinimums()

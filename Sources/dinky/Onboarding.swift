@@ -1,3 +1,4 @@
+import DinkyConfig
 import AppKit
 import ServiceManagement
 
@@ -27,8 +28,8 @@ final class Onboarding: NSObject {
     // MARK: Step 1, Accessibility
 
     private func showAccessibilityStep() {
-        show(title: "dinky needs Accessibility",
-             text: "dinky moves and tiles windows through the Accessibility API. Turn dinky on under "
+        show(title: "\(AppIdentity.name) needs Accessibility",
+             text: "\(AppIdentity.name) moves and tiles windows through the Accessibility API. Turn \(AppIdentity.name) on under "
                  + "Privacy & Security, Accessibility. This window moves on by itself once it is allowed.",
              buttons: [button("Open Accessibility Settings", #selector(openAccessibility))])
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -97,7 +98,7 @@ final class Onboarding: NSObject {
 
         if window == nil {
             let w = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            w.title = "dinky"
+            w.title = AppIdentity.name
             w.isReleasedWhenClosed = false
             window = w
         }

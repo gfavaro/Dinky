@@ -98,7 +98,7 @@ final class AppState {
     /// Explicit recovery stops tiling and retries unfinished frames without switching focus.
     func recover() -> Reply {
         guard recovery.recoverable > 0 else { return .error("no unfinished windows to restore") }
-        return .ok(setEnabled(false) + "; dinky is disabled, `dinky enable on` tiles again")
+        return .ok(setEnabled(false) + "; \(AppIdentity.name) is disabled, `\(AppIdentity.command) enable on` tiles again")
     }
 
     /// Quitting stops tiling and restores reachable untiled frames and surviving original Spaces.

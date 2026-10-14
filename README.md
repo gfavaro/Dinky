@@ -1,3 +1,13 @@
+# DinkyWinky
+
+DinkyWinky is a personal fork of [Dinky](https://github.com/mikker/Dinky) for testing tab groups and session restoration. The independent feature branches keep the upstream app identity for future pull requests. The `fork/dinkywinky` branch contains the combined build and its separate identity.
+
+Install the local signed bundle with `scripts/bundle.sh`. It produces `build/DinkyWinky.app`; the bundled CLI is `Contents/MacOS/dinkywinky`. The app uses `~/.config/dinkywinky/dinkywinky.toml`, `~/Library/Application Support/dinkywinky`, `~/Library/Logs/dinkywinky.log`, and its own temporary command socket. Its bundle identifier is `com.gfavaro.DinkyWinky`. The upstream automatic update feed is disabled for this build.
+
+Dinky and DinkyWinky can both be installed. Quit one before running the other. Comparison builds use separate saved state; copying the initial config does not synchronize later changes. DinkyWinky needs its own Accessibility grant. Use the local bundle workflow for this fork; upstream release and VM scripts retain their original Dinky packaging and credentials.
+
+---
+
 <img src="docs/assets/icon.png" alt="dinky" width="128">
 
 # dinky

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds build/dinky.app and signs it with a stable identity, so the Accessibility grant survives rebuilds.
+# Builds build/DinkyWinky.app and signs it with a stable identity, so the Accessibility grant survives rebuilds.
 # Usage: scripts/bundle.sh [--debug]
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -13,10 +13,10 @@ CONFIG=release
 
 swift build -c "$CONFIG"
 
-APP=build/dinky.app
+APP=build/DinkyWinky.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-cp "$(swift build -c "$CONFIG" --show-bin-path)/dinky" "$APP/Contents/MacOS/dinky"
+cp "$(swift build -c "$CONFIG" --show-bin-path)/dinky" "$APP/Contents/MacOS/dinkywinky"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD" "$APP/Contents/Info.plist"

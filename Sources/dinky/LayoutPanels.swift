@@ -1,3 +1,4 @@
+import DinkyConfig
 import AppKit
 import DinkyPrivate
 
@@ -17,7 +18,7 @@ func layoutPanel(_ view: NSView, ignoresMouse: Bool) -> NSPanel {
     if ignoresMouse { panel.setAccessibilityElement(false); panel.setAccessibilityHidden(true) }
     else {
         panel.setAccessibilityRole(.window)
-        panel.setAccessibilityLabel("Dinky window tabs")
+        panel.setAccessibilityLabel("\(AppIdentity.name) window tabs")
     }
     return panel
 }

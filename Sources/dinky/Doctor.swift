@@ -11,8 +11,8 @@ func runDoctor(_ args: [String]) -> Int32 {
     func fail(_ text: String) { errors += 1; print("  error: \(text)") }
 
     let os = ProcessInfo.processInfo.operatingSystemVersion
-    print("dinky doctor")
-    print("  macOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion), dinky was built against 27.0")
+    print("\(AppIdentity.name) doctor")
+    print("  macOS \(os.majorVersion).\(os.minorVersion).\(os.patchVersion), \(AppIdentity.name) was built against 27.0")
 
     var url = Config.userConfigURL
     if let i = args.firstIndex(of: "--config"), i + 1 < args.count { url = URL(fileURLWithPath: args[i + 1]) }

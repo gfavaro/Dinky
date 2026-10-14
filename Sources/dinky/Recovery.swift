@@ -1,3 +1,4 @@
+import DinkyConfig
 import AppKit
 import DinkyLayout
 import DinkyPrivate
@@ -27,7 +28,7 @@ final class Recovery {
     }
 
     static let url = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/dinky/journal.json")
+        .appendingPathComponent("Library/Application Support/\(AppIdentity.directory)/journal.json")
 
     /// Unfinished windows, including records carried from a previous session.
     var recoverable: Int { recording ? carried.filter { entries[$0] != nil }.count : entries.count }

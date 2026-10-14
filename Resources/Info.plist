@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.brnbw.dinky</string>
+	<string>com.gfavaro.DinkyWinky</string>
 	<key>CFBundleName</key>
-	<string>dinky</string>
+	<string>DinkyWinky</string>
 	<key>CFBundleExecutable</key>
-	<string>dinky</string>
+	<string>dinkywinky</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -22,9 +22,7 @@
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
-	<key>SUFeedURL</key>
-	<string>https://github.com/mikker/Dinky/releases/latest/download/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>jif/E57Xw8xCo7BwHnOeASD+nbQc462aQTYOuvoH/io=</string>
+	<key>CFBundleDisplayName</key>
+	<string>DinkyWinky</string>
 </dict>
 </plist>

@@ -148,7 +148,7 @@ enum Dispatcher {
     private static func show(_ n: Int, landed: (() -> Void)? = nil) -> Reply {
         let model = AppState.shared.displays
         guard let space = AppState.shared.numbers.space(of: n), let display = model.display(containingSpace: space) else {
-            return .error("workspace \(n) has no Space; see `dinky doctor`")
+            return .error("workspace \(n) has no Space; see `\(AppIdentity.command) doctor`")
         }
         // On screen and staying there; a switch still on its way is not, and takes `arrive` for when it lands.
         let showing = display.currentSpaceID == space && targetSpaceID(on: display) == space
@@ -179,7 +179,7 @@ enum Dispatcher {
         }
         guard let space = AppState.shared.numbers.space(of: n),
               let to = AppState.shared.displays.display(containingSpace: space) else {
-            return .error("workspace \(n) has no Space; see `dinky doctor`")
+            return .error("workspace \(n) has no Space; see `\(AppIdentity.command) doctor`")
         }
         if let reply = relocate(wid, to: space, on: to, destination: "workspace \(n)", follow: follow) { return reply }
         // macOS activates another app when the Space left behind loses the active app's window, so focus the

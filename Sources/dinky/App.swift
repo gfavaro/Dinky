@@ -7,7 +7,7 @@ import Sparkle
 // items, and the socket the CLI talks to.
 func runApp() -> Int32 {
     guard !appIsRunning() else {
-        fputs("dinky: already running (\(socketPath))\n", stderr)
+        fputs("\(AppIdentity.name): already running (\(socketPath))\n", stderr)
         return 1
     }
     let app = NSApplication.shared
@@ -95,6 +95,7 @@ final class DinkyApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         bindings = MenuBindings(state.config.modes[mode])
         let count = state.numbers.count
         let current = state.displays.focusedDisplay().flatMap(state.numbers.current(on:))
+        menu.addItem(withTitle: AppIdentity.name, action: nil, keyEquivalent: "")
         menu.addItem(withTitle: "Workspace \(current.map { "\($0)" } ?? "?") of \(count)", action: nil, keyEquivalent: "")
         if mode != "main" {
             menu.addItem(withTitle: "Mode: \(mode)", action: nil, keyEquivalent: "")
@@ -187,10 +188,12 @@ final class DinkyApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item("Restore \(recoverable) unfinished windows", "recover"))
         }
         menu.addItem(.separator())
-        let updates = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
-        updates.target = self
-        menu.addItem(updates)
-        menu.addItem(NSMenuItem(title: "Quit dinky", action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
+        if Bundle.main.infoDictionary?["SUFeedURL"] != nil {
+            let updates = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+            updates.target = self
+            menu.addItem(updates)
+        }
+        menu.addItem(NSMenuItem(title: "Quit \(AppIdentity.name)", action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
     }
 
     private func item(_ title: String, _ command: String, enabled: Bool = true) -> NSMenuItem {
@@ -201,7 +204,7 @@ final class DinkyApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let it = NSMenuItem(title: title, action: #selector(runCommand(_:)), keyEquivalent: "")
         it.target = self
         it.representedObject = commands
-        it.toolTip = commands.map { "dinky \($0)" }.joined(separator: "\n")
+        it.toolTip = commands.map { "\(AppIdentity.command) \($0)" }.joined(separator: "\n")
         it.isEnabled = enabled
         if let (equivalent, mask) = key?.menuKey {
             it.keyEquivalent = equivalent
