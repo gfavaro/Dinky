@@ -52,3 +52,5 @@ drop-targets = true
 Check light and dark appearances, borders on and off, and narrow tab strips.
 Run the native window checks on macOS 15 or 26 before merge; forcing the fallback
 style on macOS 27 verifies the control path but does not test the older OS.
+
+Check a narrow group with ten windows. The selected tab must stay visible. Use the arrows and trackpad to scroll, then select and close a test window. Check that the action applies to the tab under the pointer. In a wide group, click the blank area after the tabs; selection must stay unchanged. Drag between tabs and check that the insertion marker stays above the strip.

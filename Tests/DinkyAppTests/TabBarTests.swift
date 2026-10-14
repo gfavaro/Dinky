@@ -13,7 +13,7 @@ struct TabBarTests {
         let view = TabBarView(frame: CGRect(x: 0, y: 0, width: width, height: 28))
         let panel = layoutPanel(view, ignoresMouse: false)
         panel.setFrame(CGRect(x: 0, y: 0, width: width, height: 28), display: false)
-        let control = view.subviews.compactMap { $0 as? NSSegmentedControl }.first!
+        let control = document(in: view).subviews.compactMap { $0 as? NSSegmentedControl }.first!
         if !nativeTabs {
             if #available(macOS 27.0, *) { control.setValue(NSNumber(value: 0), forKey: "role") }
             control.segmentStyle = .capsule
@@ -24,6 +24,10 @@ struct TabBarTests {
         #expect(icon.size == originalSize, "Do not resize a shared application icon")
         view.layoutSubtreeIfNeeded()
         return (view, panel)
+    }
+
+    private func document(in view: TabBarView) -> NSView {
+        view.subviews.compactMap { $0 as? NSScrollView }.first!.documentView!
     }
 
     private func event(_ type: NSEvent.EventType, x: CGFloat, y: CGFloat, panel: NSPanel) -> NSEvent {
@@ -63,20 +67,54 @@ struct TabBarTests {
         let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
         view.cacheDisplay(in: view.bounds, to: bitmap)
         defer { panel.close() }
-        let control = view.subviews.compactMap { $0 as? NSSegmentedControl }.first!
+        let control = document(in: view).subviews.compactMap { $0 as? NSSegmentedControl }.first!
         #expect(control.hitTest(.zero) == nil)
         for i in 0..<3 {
             #expect(control.image(forSegment: i)?.size == NSSize(width: 16, height: 16))
-            #expect(abs(control.width(forSegment: i) - control.bounds.width / 3) < 0.01)
+            #expect(control.width(forSegment: i) >= TabStripSizing.minimumWidth)
+            #expect(control.width(forSegment: i) <= TabStripSizing.maximumWidth)
         }
         var closed: WindowID?
         view.close = { closed = $0 }
-        let buttons = view.subviews.compactMap { $0 as? NSButton }
+        let buttons = document(in: view).subviews.compactMap { $0 as? NSButton }
         buttons[0].performClick(nil)
         #expect(closed == 1, "Do not close the selected third tab")
         view.mouseMoved(with: event(.mouseMoved, x: 180, y: 14, panel: panel))
         #expect(buttons[1].alphaValue == 1)
         #expect(buttons[0].alphaValue == 0)
+    }
+
+    @Test func `Crowded groups reveal selection and preserve click and close identities`() {
+        let (view, panel) = strip(width: 360)
+        defer { panel.close() }
+        var workspace = Workspace(bounds: CGRect(x: 0, y: 0, width: 360, height: 560), algorithm: .dwindle(.tabs))
+        for id: UInt32 in 1...10 { workspace.insert(id) }
+        view.configure(group: workspace.layout().tabGroups[0], titles: (1...10).map { "Window \($0)" }, icons: Array(repeating: nil, count: 10))
+        view.layoutSubtreeIfNeeded()
+        let scroll = view.subviews.compactMap { $0 as? NSScrollView }.first!
+        #expect(scroll.contentView.bounds.maxX == document(in: view).bounds.maxX)
+        #expect(view.tabFrames.allSatisfy { $0.width == 112 })
+        var selected: WindowID?, closed: WindowID?
+        view.select = { selected = $0 }
+        view.close = { closed = $0 }
+        view.mouseDown(with: event(.leftMouseDown, x: 280, y: 14, panel: panel))
+        view.mouseUp(with: event(.leftMouseUp, x: 280, y: 14, panel: panel))
+        #expect(selected == 10)
+        document(in: view).subviews.compactMap { $0 as? NSButton }.last!.performClick(nil)
+        #expect(closed == 10)
+        let previous = view.subviews.compactMap { $0 as? NSButton }.first!
+        previous.performClick(nil)
+        #expect(scroll.contentView.bounds.maxX < document(in: view).bounds.maxX)
+    }
+
+    @Test func `Blank space after bounded tabs does not select a window`() {
+        let (view, panel) = strip(width: 2000)
+        defer { panel.close() }
+        var selected: WindowID?
+        view.select = { selected = $0 }
+        view.mouseDown(with: event(.leftMouseDown, x: 1500, y: 14, panel: panel))
+        view.mouseUp(with: event(.leftMouseUp, x: 1500, y: 14, panel: panel))
+        #expect(selected == nil)
     }
 
     @Test func `Long titles cannot paint into a neighbouring close slot`() {

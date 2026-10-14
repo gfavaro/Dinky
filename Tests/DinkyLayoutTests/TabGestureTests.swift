@@ -83,3 +83,15 @@ struct TabGestureTests {
         }
     }
 }
+
+struct VariableTabGestureTests {
+    @Test func `Reorder uses the visible variable-width tab allocations`() {
+        var gesture = TabGesture(source: 2, members: [1, 2, 3], start: CGPoint(x: 90, y: 14),
+                                 strip: CGRect(x: 0, y: 0, width: 600, height: 28), count: 3)
+        let frames = [CGRect(x: -50, y: 0, width: 120, height: 28),
+                      CGRect(x: 70, y: 0, width: 300, height: 28),
+                      CGRect(x: 370, y: 0, width: 180, height: 28)]
+        #expect(gesture.update(at: CGPoint(x: 360, y: 14), tabFrames: frames) == .reorder(1))
+        #expect(gesture.finish(at: CGPoint(x: 390, y: 14), tabFrames: frames) == .reorder(2))
+    }
+}

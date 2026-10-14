@@ -132,6 +132,8 @@ ctrl-alt-cmd-s = 'layout tiles tabs scrolling'
 
 Tabs replace accordion stacking. Click a tab to select its window. Windows from
 different apps can share a group; all members stay in the same native Space.
+Tab widths follow the title length, within 112–320 points. Crowded groups scroll
+with the arrow buttons or a trackpad. Selecting a tab brings it into view.
 Tabs show the app icon and window title, with the app name as a title fallback. Drag a tab
 horizontally to reorder it. Pull it up or down out of the strip to show the drop
 targets when `[drag] drop-targets = true`, then release over a target to place

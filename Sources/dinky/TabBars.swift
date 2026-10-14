@@ -89,10 +89,19 @@ final class TabBarView: NSView {
     private var selected: WindowID?
     private var titles: [String] = []
     private var gesture: TabGesture?
-    private var dragIndex: Int?
     private var members: [WindowID] = []
     private var cornerRadius: CGFloat = 10
     private let control = TabSegmentControl(frame: .zero)
+    private let scroll = TabScrollView(frame: .zero)
+    private let document = NSView(frame: .zero)
+    private let previous = NSButton(image: NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Scroll tabs left")!, target: nil, action: nil)
+    private let next = NSButton(image: NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Scroll tabs right")!, target: nil, action: nil)
+    private let insertion = TabInsertionView(frame: .zero)
+    private var revealSelected = true
+    private var lastWidth: CGFloat = 0
+    private var dragCursor = false
+    private var gestureStartY: CGFloat = 0
+    private(set) var tabFrames: [CGRect] = []
     private var closeButtons: [TabCloseButton] = []
     private var hoverIndex: Int?
     private var area: NSTrackingArea?
@@ -106,6 +115,7 @@ final class TabBarView: NSView {
 
     func configure(group: TabGroup, titles: [String], icons: [NSImage?] = [], cornerRadius: CGFloat = 10) {
         if group.tabs != tabs || Set(group.windows) != Set(members) { cancelGesture() }
+        revealSelected = revealSelected || selected != group.selected || tabs != group.tabs
         tabs = group.tabs
         selected = group.selected
         self.titles = titles
@@ -131,7 +141,7 @@ final class TabBarView: NSView {
             button.contentTintColor = .secondaryLabelColor
             button.setButtonType(.momentaryChange)
             button.focusRingType = .none
-            addSubview(button)
+            document.addSubview(button)
             closeButtons.append(button)
         }
         for i in tabs.indices {
@@ -152,13 +162,33 @@ final class TabBarView: NSView {
             control.setValue(NSNumber(value: 1), forKey: "role")
         } else { control.segmentStyle = .capsule }
         control.trackingMode = .selectOne
-        control.segmentDistribution = .fillEqually
+        control.segmentDistribution = .fit
         control.controlSize = .regular
         control.font = .systemFont(ofSize: 13)
         control.focusRingType = .none
         control.target = self
         control.action = #selector(selectSegment(_:))
-        addSubview(control)
+        document.addSubview(control)
+        scroll.documentView = document
+        scroll.drawsBackground = false
+        scroll.hasHorizontalScroller = false
+        scroll.hasVerticalScroller = false
+        scroll.horizontalScrollElasticity = .none
+        scroll.verticalScrollElasticity = .none
+        scroll.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scroll.contentView)
+        addSubview(scroll)
+        for button in [previous, next] {
+            button.isBordered = false
+            button.controlSize = .small
+            button.contentTintColor = .secondaryLabelColor
+            button.target = self
+            button.action = #selector(scrollTabs(_:))
+            addSubview(button)
+        }
+        previous.setAccessibilityLabel("Scroll tabs left")
+        next.setAccessibilityLabel("Scroll tabs right")
+        addSubview(insertion)
         setAccessibilityElement(false)
     }
 
@@ -176,14 +206,80 @@ final class TabBarView: NSView {
         close?(id)
     }
 
+    deinit { NotificationCenter.default.removeObserver(self) }
+
     override func layout() {
         super.layout()
-        control.frame = bounds.insetBy(dx: 3, dy: 1)
         guard !tabs.isEmpty else { return }
-        let width = control.bounds.width / CGFloat(tabs.count)
+        let crowded = CGFloat(tabs.count) * TabStripSizing.minimumWidth > max(0, bounds.width - 6)
+        let inset: CGFloat = crowded ? 25 : 3
+        scroll.frame = CGRect(x: inset, y: 1, width: max(0, bounds.width - 2 * inset), height: max(0, bounds.height - 2))
+        previous.frame = CGRect(x: 2, y: 2, width: 21, height: max(0, bounds.height - 4))
+        next.frame = CGRect(x: bounds.maxX - 23, y: 2, width: 21, height: max(0, bounds.height - 4))
+        previous.isHidden = !crowded
+        next.isHidden = !crowded
+        let font = control.font ?? .systemFont(ofSize: 13)
+        let preferred = titles.map { ($0 as NSString).size(withAttributes: [.font: font]).width + 56 }
+        let widths = TabStripSizing.widths(preferred: preferred, available: scroll.bounds.width)
+        let size = CGSize(width: widths.reduce(0, +), height: scroll.bounds.height)
+        document.frame = CGRect(origin: .zero, size: size)
+        control.frame = document.bounds
+        var x: CGFloat = 0
+        tabFrames = widths.map { width in
+            defer { x += width }
+            return CGRect(x: x, y: 0, width: width, height: size.height)
+        }
+        (control.cell as? TabSegmentCell)?.frames = tabFrames
         for i in tabs.indices {
-            control.setWidth(width, forSegment: i)
-            closeButtons[i].frame = CGRect(x: control.frame.minX + CGFloat(i) * width + 5, y: bounds.midY - 8, width: 16, height: 16)
+            control.setWidth(widths[i], forSegment: i)
+            closeButtons[i].frame = CGRect(x: tabFrames[i].minX + 5, y: size.height / 2 - 8, width: 16, height: 16)
+        }
+        if revealSelected || lastWidth != bounds.width, let i = tabs.firstIndex(where: { $0 == selected }) {
+            let frame = tabFrames[i], visible = scroll.contentView.bounds
+            let offset = frame.minX < visible.minX ? frame.minX : max(visible.minX, frame.maxX - visible.width)
+            scrollTo(offset)
+        } else { scrollTo(scroll.contentView.bounds.minX) }
+        revealSelected = false
+        lastWidth = bounds.width
+        insertion.frame = bounds
+    }
+
+    @objc private func scrolled() {
+        hoverIndex = nil
+        updateCloseVisibility()
+        previous.isEnabled = scroll.contentView.bounds.minX > 0.5
+        next.isEnabled = scroll.contentView.bounds.maxX < document.bounds.maxX - 0.5
+    }
+
+    @objc private func scrollTabs(_ sender: NSButton) {
+        let step = scroll.bounds.width * 0.75 * (sender === previous ? -1 : 1)
+        scrollTo(scroll.contentView.bounds.minX + step)
+    }
+
+    private func scrollTo(_ x: CGFloat) {
+        let offset = min(max(0, x), max(0, document.bounds.width - scroll.bounds.width))
+        scroll.contentView.scroll(to: CGPoint(x: offset, y: 0))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        scrolled()
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard document.bounds.width > scroll.bounds.width else { return super.scrollWheel(with: event) }
+        let delta = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) ? event.scrollingDeltaX : event.scrollingDeltaY
+        scrollTo(scroll.contentView.bounds.minX - delta * (event.hasPreciseScrollingDeltas ? 1 : 16))
+    }
+
+    private func index(at point: CGPoint) -> Int? {
+        guard scroll.frame.contains(point) else { return nil }
+        let local = document.convert(point, from: self)
+        return tabFrames.firstIndex { $0.contains(local) }
+    }
+
+    private var globalTabFrames: [CGRect] {
+        guard let window else { return [] }
+        return tabFrames.map { frame in
+            let rect = window.convertToScreen(document.convert(frame, to: nil))
+            return CGRect(x: rect.minX, y: (NSScreen.screens.first?.frame.maxY ?? 0) - rect.maxY, width: rect.width, height: rect.height)
         }
     }
 
@@ -198,7 +294,7 @@ final class TabBarView: NSView {
     override func mouseMoved(with event: NSEvent) {
         guard !tabs.isEmpty, bounds.width > 0 else { return }
         let point = convert(event.locationInWindow, from: nil)
-        hoverIndex = min(tabs.count - 1, max(0, Int(point.x / (bounds.width / CGFloat(tabs.count)))))
+        hoverIndex = index(at: point)
         updateCloseVisibility()
     }
 
@@ -218,7 +314,8 @@ final class TabBarView: NSView {
 
     func cancelGesture() {
         gesture = nil
-        dragIndex = nil
+        insertion.marker = nil
+        if dragCursor { NSCursor.pop(); dragCursor = false }
         updateCloseVisibility()
         needsDisplay = true
     }
@@ -227,25 +324,37 @@ final class TabBarView: NSView {
         cancelGesture()
         guard !tabs.isEmpty, bounds.width > 0, let window else { return }
         let point = convert(event.locationInWindow, from: nil)
-        let index = min(tabs.count - 1, max(0, Int(point.x / (bounds.width / CGFloat(tabs.count)))))
+        guard let index = index(at: point) else { return }
         let frame = window.frame
         let strip = CGRect(x: frame.minX, y: (NSScreen.screens.first?.frame.maxY ?? 0) - frame.maxY,
                            width: frame.width, height: frame.height)
+        gestureStartY = globalPoint(event).y
         gesture = TabGesture(source: tabs[index], members: members, start: globalPoint(event), strip: strip, count: tabs.count)
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard var gesture else { return }
         let point = globalPoint(event)
-        let action = gesture.update(at: point)
+        let local = convert(event.locationInWindow, from: nil)
+        if abs(point.y - gestureStartY) <= 18 {
+            if local.x < scroll.frame.minX + 16 { scrollTo(scroll.contentView.bounds.minX - 16) }
+            else if local.x > scroll.frame.maxX - 16 { scrollTo(scroll.contentView.bounds.minX + 16) }
+        }
+        let action = gesture.update(at: point, tabFrames: globalTabFrames)
+        if action != nil, !dragCursor { NSCursor.closedHand.push(); dragCursor = true }
         self.gesture = gesture
         updateCloseVisibility()
         switch action {
         case .detach:
-            dragIndex = nil
+            insertion.marker = nil
             let title = tabs.firstIndex(of: gesture.source).map { titles[$0] } ?? "Window"
             drag?(gesture.source, point, title)
-        case .reorder(let index): dragIndex = index
+        case .reorder(let index):
+            if let from = tabs.firstIndex(of: gesture.source), from != index {
+                let frame = document.convert(tabFrames[index], to: self)
+                let x = index > from ? frame.maxX : frame.minX
+                insertion.marker = min(scroll.frame.maxX - 2, max(scroll.frame.minX + 2, x))
+            } else { insertion.marker = nil }
         default: break
         }
         needsDisplay = true
@@ -254,7 +363,7 @@ final class TabBarView: NSView {
     override func mouseUp(with event: NSEvent) {
         guard var gesture else { return }
         let point = globalPoint(event)
-        let action = gesture.finish(at: point)
+        let action = gesture.finish(at: point, tabFrames: globalTabFrames)
         cancelGesture()
         switch action {
         case .click: select?(gesture.source)
@@ -272,11 +381,7 @@ final class TabBarView: NSView {
         let background = NSBezierPath(roundedRect: bounds, xRadius: cornerRadius, yRadius: cornerRadius)
         background.appendRect(CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: bounds.height / 2))
         background.fill()
-        if let index = dragIndex, !tabs.isEmpty {
-            NSColor.controlAccentColor.setFill()
-            let x = CGFloat(index) * bounds.width / CGFloat(tabs.count)
-            NSBezierPath(rect: CGRect(x: x, y: 3, width: 2, height: max(0, bounds.height - 6))).fill()
-        }
+
     }
 }
 
@@ -295,13 +400,16 @@ private final class TabCloseButton: NSButton {
 }
 
 final class TabSegmentCell: NSSegmentedCell {
+    var frames: [CGRect] = []
     override func drawSegment(_ segment: Int, inFrame frame: NSRect, with controlView: NSView) {
         guard segmentCount > 0 else { return }
-        // Native artwork can extend beyond a segment's allocation. Use the same equal
+        // Native artwork can extend beyond a segment's allocation. Use the same
         // allocations as the strip's buttons, keeping their reserved slots clear.
         let width = controlView.bounds.width / CGFloat(segmentCount)
-        let content = NSRect(x: controlView.bounds.minX + CGFloat(segment) * width + 24,
-                             y: frame.minY, width: max(0, width - 32), height: frame.height)
+        let allocation = frames.indices.contains(segment) ? frames[segment]
+            : CGRect(x: controlView.bounds.minX + CGFloat(segment) * width, y: frame.minY, width: width, height: frame.height)
+        let content = NSRect(x: allocation.minX + 24, y: frame.minY,
+                             width: max(0, allocation.width - 32), height: frame.height)
         guard !content.isEmpty else { return }
         // Clip each segment independently so it cannot cover a close button or neighbouring tab.
         NSGraphicsContext.saveGraphicsState()
@@ -317,6 +425,27 @@ private final class TabSegmentControl: NSSegmentedControl {
         set {}
     }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+/// Keep pointer gestures on the strip while native buttons retain their own input handling.
+private final class TabScrollView: NSScrollView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hit = super.hitTest(point)
+        return hit is NSButton ? hit : superview
+    }
+}
+
+private final class TabInsertionView: NSView {
+    var marker: CGFloat? { didSet { needsDisplay = true } }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func draw(_ dirtyRect: NSRect) {
+        guard let x = marker else { return }
+        NSColor.controlAccentColor.setFill()
+        NSBezierPath(roundedRect: CGRect(x: x - 1.5, y: 3, width: 3, height: max(0, bounds.height - 6)), xRadius: 1.5, yRadius: 1.5).fill()
+        for y in [CGFloat(3), bounds.height - 3] {
+            NSBezierPath(ovalIn: CGRect(x: x - 3, y: y - 3, width: 6, height: 6)).fill()
+        }
+    }
 }
 
 /// WinMuxX's group-shell principle with Dinky's system background and existing focus border.

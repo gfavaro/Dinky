@@ -22,19 +22,24 @@ public struct TabGesture {
         self.count = count
     }
 
-    public mutating func update(at point: CGPoint) -> Action? {
+    public mutating func update(at point: CGPoint, tabFrames: [CGRect]? = nil) -> Action? {
         let dx = point.x - start.x, dy = point.y - start.y
         if !moved, hypot(dx, dy) < 4 { return nil }
         moved = true
         if abs(dy) > 18 { detached = true }
         if detached { return .detach }
         guard count > 0, strip.width > 0 else { return nil }
-        let index = min(count - 1, max(0, Int((point.x - strip.minX) / (strip.width / CGFloat(count)))))
+        let index: Int
+        if let tabFrames, tabFrames.count == count {
+            index = tabFrames.firstIndex { point.x < $0.maxX } ?? count - 1
+        } else {
+            index = min(count - 1, max(0, Int((point.x - strip.minX) / (strip.width / CGFloat(count)))))
+        }
         return .reorder(index)
     }
 
-    public mutating func finish(at point: CGPoint) -> Action {
-        update(at: point) ?? .click
+    public mutating func finish(at point: CGPoint, tabFrames: [CGRect]? = nil) -> Action {
+        update(at: point, tabFrames: tabFrames) ?? .click
     }
 }
 
