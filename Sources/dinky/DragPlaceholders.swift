@@ -22,11 +22,21 @@ final class DragPlaceholders {
         } else { target?.orderOut(nil) }
     }
 
-    func contains(_ id: WindowID) -> Bool { [home, target].compactMap { $0 }.contains { UInt32($0.windowNumber) == id } }
+    func contains(_ id: WindowID) -> Bool {
+        home.map { UInt32($0.windowNumber) == id } == true
+            || target.map { UInt32($0.windowNumber) == id } == true
+    }
 
-    func hide() {
-        home?.orderOut(nil)
-        target?.orderOut(nil)
+    func hide(release: Bool = false) {
+        if release {
+            home?.close()
+            target?.close()
+            home = nil
+            target = nil
+        } else {
+            home?.orderOut(nil)
+            target?.orderOut(nil)
+        }
     }
 
     private func place(_ panel: NSPanel, at rect: CGRect, below window: WindowID, cornerRadius: CGFloat) {

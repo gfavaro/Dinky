@@ -19,7 +19,10 @@ final class TabBars {
 
     var isInteracting: Bool { panels.values.contains { ($0.contentView as? TabBarView)?.hasGesture == true } }
 
-    func contains(_ id: WindowID) -> Bool { (Array(panels.values) + Array(shells.values)).contains { UInt32($0.windowNumber) == id } }
+    func contains(_ id: WindowID) -> Bool {
+        panels.values.contains { UInt32($0.windowNumber) == id }
+            || shells.values.contains { UInt32($0.windowNumber) == id }
+    }
 
     func update(_ layouts: [(space: UInt64, layout: Layout)], model: WindowModel) {
         var wanted: Set<Key> = []
@@ -40,8 +43,9 @@ final class TabBars {
                     }, cornerRadius: CGFloat(model.windows[group.selected]?.cornerRadius ?? 10))
                     let shell = shells[key] ?? layoutPanel(TabShellView(frame: .zero), ignoresMouse: true)
                     shells[key] = shell
-                    (shell.contentView as! TabShellView).cornerRadius = CGFloat(model.windows[group.selected]?.cornerRadius ?? 10)
-                    placeLayoutPanel(shell, frame: group.frame, space: space, above: group.selected, order: .below)
+                    let shellFrame = (shell.contentView as! TabShellView).configure(
+                        groupFrame: group.frame, cornerRadius: CGFloat(model.windows[group.selected]?.cornerRadius ?? 10))
+                    placeLayoutPanel(shell, frame: shellFrame, space: space, above: group.selected, order: .below)
                     shell.contentView?.needsDisplay = true
                     view.select = { [weak self] id in self?.select?(id) }
                     view.close = { [weak self] id in self?.close?(id) }
@@ -318,14 +322,26 @@ private final class TabSegmentControl: NSSegmentedControl {
 /// WinMuxX's group-shell principle with Dinky's system background and existing focus border.
 /// The content cutout stays transparent and never intercepts mouse input.
 final class TabShellView: NSView {
+    private var groupHeight: CGFloat = 0
     var cornerRadius: CGFloat = 10
     override var isFlipped: Bool { true }
 
+    /// Only the strip and the active window's top corners need background pixels.
+    /// A full-group transparent panel would still allocate a full-size backing surface.
+    func configure(groupFrame: CGRect, cornerRadius: CGFloat) -> CGRect {
+        groupHeight = groupFrame.height
+        self.cornerRadius = cornerRadius
+        var frame = groupFrame
+        frame.size.height = min(groupFrame.height, TabGroup.barHeight + max(0, cornerRadius))
+        return frame
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        let shell = NSBezierPath(roundedRect: bounds, xRadius: cornerRadius, yRadius: cornerRadius)
-        let height = min(TabGroup.barHeight, bounds.height)
-        let content = CGRect(x: bounds.minX, y: bounds.minY + height,
-                             width: bounds.width, height: max(0, bounds.height - height))
+        let group = CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: max(bounds.height, groupHeight))
+        let shell = NSBezierPath(roundedRect: group, xRadius: cornerRadius, yRadius: cornerRadius)
+        let height = min(TabGroup.barHeight, group.height)
+        let content = CGRect(x: group.minX, y: group.minY + height,
+                             width: group.width, height: max(0, group.height - height))
         if !content.isEmpty { shell.append(NSBezierPath(roundedRect: content, xRadius: cornerRadius, yRadius: cornerRadius)) }
         shell.windingRule = .evenOdd
         NSColor.windowBackgroundColor.setFill()

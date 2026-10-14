@@ -114,6 +114,30 @@ struct TabBarTests {
         #expect(bitmap.colorAt(x: bitmap.pixelsWide / 2, y: 8)!.alphaComponent > 0)
     }
 
+    @Test(arguments: [CGFloat(0), 10, 16, 60], [CGFloat(20), 50, 400])
+    func `A compact shell paints the same strip and corner pixels`(_ radius: CGFloat, _ height: CGFloat) {
+        let groupFrame = CGRect(x: -900, y: -1400, width: 400, height: height)
+        let full = TabShellView(frame: CGRect(origin: .zero, size: groupFrame.size))
+        _ = full.configure(groupFrame: groupFrame, cornerRadius: radius)
+        let compact = TabShellView(frame: .zero)
+        let frame = compact.configure(groupFrame: groupFrame, cornerRadius: radius)
+        #expect(frame == CGRect(x: -900, y: -1400, width: 400, height: min(height, 28 + radius)))
+        compact.frame = CGRect(origin: .zero, size: frame.size)
+        let reference = full.bitmapImageRepForCachingDisplay(in: full.bounds)!
+        full.cacheDisplay(in: full.bounds, to: reference)
+        let bitmap = compact.bitmapImageRepForCachingDisplay(in: compact.bounds)!
+        compact.cacheDisplay(in: compact.bounds, to: bitmap)
+        #expect(bitmap.bytesPerRow == reference.bytesPerRow)
+        #expect(bitmap.pixelsWide == reference.pixelsWide)
+        let count = bitmap.bytesPerRow * bitmap.pixelsHigh
+        let actual = UnsafeBufferPointer(start: bitmap.bitmapData!, count: count)
+        let expected = UnsafeBufferPointer(start: reference.bitmapData!, count: count)
+        // CoreGraphics antialiasing can round a channel by one byte with a different clip height.
+        #expect(zip(actual, expected).allSatisfy { abs(Int($0.0) - Int($0.1)) <= 1 })
+        let tiny = compact.configure(groupFrame: CGRect(x: 0, y: 0, width: 100, height: 20), cornerRadius: 10)
+        #expect(tiny.height == 20)
+    }
+
     @Test func `Creating and closing tab panels does not retain windows`() {
         _ = NSApplication.shared
         let before = NSApp.windows.count

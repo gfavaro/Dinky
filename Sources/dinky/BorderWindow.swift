@@ -19,13 +19,12 @@ final class BorderWindow {
         }
     }
 
-    private let target: UInt32
+    private var target: UInt32
     /// The border's own WindowServer window id (0 until created).
     private(set) var id: UInt32 = 0
     private var scale = 0.0
     private var spaceID: UInt64 = 0
     private var drawn: Look?
-    private var isShown = false
 
     init(target: UInt32) {
         self.target = target
@@ -57,13 +56,19 @@ final class BorderWindow {
             dinky_border_update(id, target, window.frame, Int32(window.cornerRadius), rgba, config.width, order)
             drawn = look
         }
-        isShown = true
     }
 
+    /// Reuse a group's border when its selected member changes.
+    func retarget(_ target: UInt32) { self.target = target }
+
     func hide() {
-        guard isShown else { return }
-        dinky_border_hide(id)
-        isShown = false
+        guard id != 0 else { return }
+        // An ordered-out border still owns a full-window backing surface.
+        dinky_border_destroy(id)
+        id = 0
+        scale = 0
+        spaceID = 0
+        drawn = nil
     }
 
     // JankyBorders sets the resolution once, at creation; a display change gets a new window.

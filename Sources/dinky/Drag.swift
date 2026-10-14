@@ -61,8 +61,8 @@ extension Coordinator {
         dragSession = nil
         tabBars.cancelGesture()
         tabDragProxy.hide()
-        placeholders.hide()
-        dropOverlay.hide()
+        placeholders.hide(release: true)
+        dropOverlay.hide(release: true)
         dragEvents.suppressUntilRelease()
         cancelledDragSpace = session.space
         dirty.insert(session.space)
@@ -83,8 +83,8 @@ extension Coordinator {
         dragSession = nil
         tabBars.cancelGesture()
         tabDragProxy.hide()
-        placeholders.hide()
-        dropOverlay.hide()
+        placeholders.hide(release: true)
+        dropOverlay.hide(release: true)
         guard enabled, model.windows[session.identity.id]?.identity == session.identity,
               placements[session.identity.id]?.space == session.space, isVisible(session.space),
               let window = model.windows[session.identity.id], let expected = session.layout.frames[window.id] else { return }

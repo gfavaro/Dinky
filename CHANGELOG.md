@@ -13,6 +13,8 @@
 
 ### Fixed
 
+- Tab shells allocate only the strip and top-corner area. Hidden borders release their graphics surfaces, and switching tabs reuses the group border. Drag previews release their surfaces when the drag ends or is cancelled.
+- Repeated title events share one pending Accessibility read and one follow-up read. Requests for groups that disappear are skipped before the read starts.
 - Release a tracked window from its layout if it becomes a panel or leaves the normal window layer. Hidden document windows retain their classification.
 
 ## 0.18

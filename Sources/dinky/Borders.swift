@@ -32,7 +32,8 @@ final class BorderManager {
         self.isAnimating = isAnimating
         refreshSpaces()
         focusedID = dinky_border_focused_window()
-        syncAll()
+        pending.all = true
+        scheduleFlush()
     }
 
     func update(config: Borders) {
@@ -51,6 +52,16 @@ final class BorderManager {
             for id in layout.tabBorderFrames.keys { result[id] = layout.frames[id] }
         }
         guard frames != tabFrames || contents != tabContents || suppressed != suppressedTabs else { return }
+        // Carry one backing surface with each visible group instead of one per member.
+        for layout in layouts {
+            for group in layout.tabGroups where frames[group.selected] == group.frame && (borders[group.selected]?.id ?? 0) == 0 {
+                if let previous = group.windows.first(where: { borders[$0].map { $0.id != 0 } == true }),
+                   let border = borders.removeValue(forKey: previous) {
+                    border.retarget(group.selected)
+                    borders[group.selected] = border
+                }
+            }
+        }
         tabFrames = frames
         tabContents = contents
         suppressedTabs = suppressed

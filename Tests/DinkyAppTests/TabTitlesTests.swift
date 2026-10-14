@@ -73,4 +73,18 @@ struct TabTitlesTests {
         #expect(reads.count == 2)
     }
 
+    @Test func `A title-event burst queues one follow-up read`() async {
+        let reads = TitleReads()
+        let titles = TabTitles(readTitle: { _ in reads.record(); return "Current title" })
+        let window = window()
+        titles.keep([window.identity])
+        _ = titles.title(for: window)
+        for _ in 0..<1_000 {
+            titles.invalidate(window.id)
+            _ = titles.title(for: window)
+        }
+        await load(titles, window: window)
+        #expect(titles.title(for: window) == "Current title")
+        #expect(reads.count == 2)
+    }
 }

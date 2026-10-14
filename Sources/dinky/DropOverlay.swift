@@ -21,9 +21,11 @@ final class DropOverlay {
         shown = (frame, zone, dragged)
     }
 
-    func hide() {
-        guard shown != nil else { return }
-        panel?.orderOut(nil)
+    func hide(release: Bool = false) {
+        if release {
+            panel?.close()
+            panel = nil
+        } else { panel?.orderOut(nil) }
         shown = nil
     }
 }

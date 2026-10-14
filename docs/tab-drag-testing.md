@@ -13,7 +13,8 @@ Run the package checks with `swift test`. To run only the AppKit checks, use
 The app tests use offscreen panels and stub close callbacks. They do not close
 application windows, move user windows, switch Spaces, or install an event tap.
 They cover tab selection, reorder, detach, cancellation, title clipping,
-close-button targeting, title caching, and panel cleanup. The fallback tab
+close-button targeting, title-event coalescing, title caching, compact shell rendering,
+and panel cleanup. The fallback tab
 style can be exercised on macOS 27 as well as the native tab role.
 
 The pure layout tests cover directional drops in dwindle, fixed, and scrolling
@@ -45,6 +46,7 @@ drop-targets = true
 | Hide an app, minimize a member, or switch an application's native tabs | Window membership follows Dinky's existing visibility and replacement handling. |
 | Disconnect and reconnect a display | Panels follow the current layout and stay on their assigned native Space. |
 | Disable and enable Dinky | Panels close while disabled and rebuild when enabled. |
+| Switch tabs and Spaces repeatedly, then finish a drag | Hidden full-size border and preview windows are released. Tab selection reuses the current group border. |
 | Turn off drop targets | Dragging over another tile swaps the windows; other drops return to the existing allocation. |
 
 Check light and dark appearances, borders on and off, and narrow tab strips.
