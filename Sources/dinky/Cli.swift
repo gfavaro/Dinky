@@ -27,7 +27,7 @@ func sendAndPrint(_ line: String) -> Int32 {
 func runHelp() -> Int32 {
     let cliOnly = [
         ("app", "Run the app in the foreground, logging to the terminal."),
-        ("recover", "Restore unfinished window frames, preserving native Spaces."),
+        ("recover", "Retry unfinished original frames and Spaces; leave dinky disabled."),
         ("debug events|windows", "Print the live window event stream, or the current windows, for bug reports."),
         ("doctor [--config <path>]", "Check the config and the macOS settings dinky depends on. Exit 1 on errors."),
         ("version, -v, --version", "Print the version and build number."),
