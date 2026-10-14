@@ -18,7 +18,7 @@ struct TabTitlesTests {
     private func load(_ titles: TabTitles, window: Window) async {
         await withCheckedContinuation { continuation in
             titles.changed = { continuation.resume() }
-            _ = titles.title(for: window)
+            #expect(titles.title(for: window) == "Test app")
             _ = titles.title(for: window) // Duplicate requests must share the same read.
         }
         titles.changed = nil
@@ -29,12 +29,10 @@ struct TabTitlesTests {
         let titles = TabTitles(readTitle: { _ in reads.record(); return "  Document  \n" })
         let window = window()
         titles.keep([window.identity])
-        #expect(titles.title(for: window) == "Test app")
         await load(titles, window: window)
         #expect(titles.title(for: window) == "Document")
         #expect(reads.count == 1)
         titles.invalidate(window.id)
-        #expect(titles.title(for: window) == "Test app")
         await load(titles, window: window)
         #expect(titles.title(for: window) == "Document")
         #expect(reads.count == 2)
