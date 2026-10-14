@@ -6,8 +6,8 @@ extension Workspace {
     /// for the right and bottom edges, left and up for the left and top ones. Along each axis where the size
     /// differs, the nearest tiles container running along it with a neighbour on the moved side changes its
     /// ratios, the difference going to or coming from that neighbour only; with no edge named for an axis, both
-    /// neighbours share it. No share drops below `minimumRatio` and no tile below its minimum size. An accordion
-    /// child resizes its accordion, whose children share one rectangle. Does nothing in fullscreen.
+    /// neighbours share it. No share drops below `minimumRatio` and no tile below its minimum size. A tab
+    /// member resizes its group, whose children share one rectangle. Does nothing in fullscreen.
     /// False when nothing changed.
     @discardableResult
     public mutating func resize(_ id: WindowID, to size: CGSize, moving edges: Set<Direction> = []) -> Bool {

@@ -30,7 +30,7 @@ extension Coordinator {
                 let layout = workspace.layout()
                 return [
                     "display": displays.display(containingSpace: key)?.uuid ?? "", "space": key,
-                    "mode": workspace.root.mode == .accordion ? "accordion" : "tiles",
+                    "mode": workspace.root.mode == .tabs ? "tabs" : "tiles",
                     "windows": workspace.windows,
                     "focused": workspace.focused ?? 0,
                     "fullscreen": workspace.fullscreen ?? 0,
@@ -50,6 +50,7 @@ extension Coordinator {
                 return [
                     "id": w.id, "pid": w.pid, "app": w.appName ?? "", "bundle-id": w.bundleID ?? "",
                     "frame": json(w.frame), "space": w.spaceID, "normal": w.isNormal, "minimized": w.isMinimized,
+                    "level": w.level, "document": w.isDocument, "ordered-in": w.isOrderedIn, "visible": w.isVisible,
                     "hidden": isHidden(w.pid),
                     "live-frame": live.exists ? json(live.frame) : [], "live-space": dinky_window_space_id(w.id),
                 ] as [String: Any]

@@ -2,14 +2,14 @@ import CoreGraphics
 import Testing
 @testable import DinkyLayout
 
-/// Tree shape as text: "h[1 v[2 3]]", accordions prefixed with "a", e.g. "ah[1 2]", `auto` as "*".
+/// Tree shape as text: "h[1 v[2 3]]", tab groups prefixed with "t", e.g. "th[1 2]", `auto` as "*".
 func shape(_ c: Container) -> String {
     let axis = switch c.orientation {
     case .horizontal: "h"
     case .vertical: "v"
     case .auto: "*"
     }
-    let kind = (c.mode == .accordion ? "a" : "") + axis
+    let kind = (c.mode == .tabs ? "t" : "") + axis
     let inner = c.children.map { node -> String in
         switch node {
         case .window(let id): "\(id)"

@@ -10,7 +10,7 @@ extension Config {
 
     start-at-login = true
     workspaces = 5                  # across all displays, one native Space each
-    default-layout = 'tiles'        # tiles (dwindle) | dwindle | accordion | fixed | scrolling
+    default-layout = 'tiles'        # tiles (dwindle) | dwindle | tabs | fixed | scrolling
     default-tiling = true           # false leaves workspaces untiled unless overridden
     follow-app-activation = true    # Cmd-Tab and Dock clicks switch Spaces the fast way
     float-windows-without-fullscreen = true   # progress windows, About, Calculator and the like float
@@ -23,11 +23,11 @@ extension Config {
     # layout = 'fixed'
     # columns = 2
     # rows = 3
-    # expand = 'columns'           # columns | rows | accordion (overflow in last cell)
+    # expand = 'columns'           # columns | rows | tabs (overflow in last cell)
 
     [accordion]
-    padding = 30                    # points the neighbours peek out by
-    orientation = 'auto'            # auto: run along the container's longer side | keep
+    padding = 30                    # legacy setting; accepted without effect
+    orientation = 'auto'            # legacy setting; accepted without effect
 
     [scrolling]
     column-width = 0.49             # a new column's share of the display; a lone column fills it
@@ -56,13 +56,14 @@ extension Config {
     [focus-follows-mouse]
     enabled = false
     delay-ms = 100                  # how long the pointer rests on a window before it takes focus
-    accordion-edges = true          # resting on a peeking accordion edge focuses that window
+    accordion-edges = true          # legacy setting; accepted without effect
 
     [animations]
     enabled = true                  # windows glide to their tiles; off while Reduce Motion is on
     duration-ms = 150               # roughly how long a window takes to arrive
 
     [drag]
+    drop-targets = false             # show directional, swap and tab targets during a drag
     placeholders = true             # outline where a dragged tile came from and the tile it will swap with
 
     # Which key of each pair bindings answer to: both | left | right. With alt = 'left',
@@ -120,7 +121,7 @@ extension Config {
     alt-equal = 'resize smart +50'
     alt-f = 'fullscreen'
     alt-shift-f = 'layout floating tiling'
-    alt-comma = 'layout accordion'
+    alt-comma = 'layout tabs'
     alt-slash = 'layout tiles'
     alt-shift-n = 'move-window-to-display next'
     alt-shift-semicolon = 'mode service'

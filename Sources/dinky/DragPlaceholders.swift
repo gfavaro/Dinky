@@ -1,47 +1,45 @@
 import AppKit
 import DinkyLayout
+import DinkyPrivate
 
 // While a tiled window is dragged: a quiet outline of the tile it came from, and an accent-coloured one over the
 // tile it would swap with. Two borderless panels that never take focus or clicks, kept just below the dragged
 // window so they never cover it. They snap between tiles; nothing reflows until the drop.
 final class DragPlaceholders {
-    private lazy var home = Self.panel(PlaceholderView(tint: .secondaryLabelColor, fill: 0.06, stroke: 0.45))
-    private lazy var target = Self.panel(PlaceholderView(tint: .controlAccentColor, fill: 0.2, stroke: 0.9))
+    private var home: NSPanel?
+    private var target: NSPanel?
 
     /// Show the outlines for a window being dragged: `home` is its tile, `target` the tile it would swap with.
     /// Rects are top-left global, as tiles are.
     func show(dragged: WindowID, home homeRect: CGRect, target targetRect: CGRect?, cornerRadius: CGFloat) {
+        let home = self.home ?? Self.panel(PlaceholderView(tint: .secondaryLabelColor, fill: 0.06, stroke: 0.45))
+        self.home = home
         place(home, at: homeRect, below: dragged, cornerRadius: cornerRadius)
-        if let targetRect { place(target, at: targetRect, below: dragged, cornerRadius: cornerRadius) } else { target.orderOut(nil) }
+        if let targetRect {
+            let target = self.target ?? Self.panel(PlaceholderView(tint: .controlAccentColor, fill: 0.2, stroke: 0.9))
+            self.target = target
+            place(target, at: targetRect, below: dragged, cornerRadius: cornerRadius)
+        } else { target?.orderOut(nil) }
     }
 
+    func contains(_ id: WindowID) -> Bool { [home, target].compactMap { $0 }.contains { UInt32($0.windowNumber) == id } }
+
     func hide() {
-        home.orderOut(nil)
-        target.orderOut(nil)
+        home?.orderOut(nil)
+        target?.orderOut(nil)
     }
 
     private func place(_ panel: NSPanel, at rect: CGRect, below window: WindowID, cornerRadius: CGFloat) {
         (panel.contentView as! PlaceholderView).cornerRadius = cornerRadius
-        panel.setFrame(Self.appKitFrame(rect), display: true)
+        let converted = appKitLayoutFrame(rect)
+        if panel.frame != converted { panel.setFrame(converted, display: true) }
+        let id = UInt32(panel.windowNumber), space = dinky_window_space_id(window)
+        if dinky_window_space_id(id) != space { dinky_border_move_to_space(id, space) }
         panel.order(.below, relativeTo: Int(window))
     }
 
     private static func panel(_ view: PlaceholderView) -> NSPanel {
-        let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = false
-        panel.ignoresMouseEvents = true
-        panel.animationBehavior = .none
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .transient]
-        panel.contentView = view
-        return panel
-    }
-
-    /// Top-left global to AppKit's bottom-left, flipped around the primary screen.
-    private static func appKitFrame(_ rect: CGRect) -> CGRect {
-        let height = NSScreen.screens.first?.frame.height ?? 0
-        return CGRect(x: rect.minX, y: height - rect.maxY, width: rect.width, height: rect.height)
+        layoutPanel(view, ignoresMouse: true)
     }
 }
 

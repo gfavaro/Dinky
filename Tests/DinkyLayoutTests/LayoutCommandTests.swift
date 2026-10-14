@@ -51,9 +51,9 @@ struct FullscreenExitTests {
     }
 }
 
-struct AccordionCommandTests {
-    @Test func `Focus cycles through accordion order and brings it to front`() {
-        var ws = workspace(3, algorithm: .dwindle(.accordion))
+struct TabCommandTests {
+    @Test func `Focus cycles through tab order and brings it to front`() {
+        var ws = workspace(3, algorithm: .dwindle(.tabs))
         #expect(ws.focus(.left) == true)
         #expect(ws.focused == 2)
         #expect(ws.layout().order.first == 2)
@@ -68,8 +68,8 @@ struct AccordionCommandTests {
         var ws = workspace(3, bounds: rect(0, 0, 3000, 500))
         ws.resize(by: 300)
         let tiles = ws.layout()
-        ws.setMode(.accordion)
-        #expect(ws.container(of: 3)?.mode == .accordion)
+        ws.setMode(.tabs)
+        #expect(ws.container(of: 3)?.mode == .tabs)
         #expect(ws.layout() != tiles)
         ws.setMode(.tiles)
         #expect(ws.container(of: 3)?.mode == .tiles)
@@ -153,8 +153,8 @@ struct MinimumSizeTests {
         assertRatios(ws.root.ratios, [0.5, 0.5])
     }
 
-    @Test func `Accordion minimum includes the peeking neighbours`() {
-        let accordion = Node.container(Container(.horizontal, .accordion, [.window(1), .window(2), .window(3)]))
-        #expect(accordion.minimumExtent(.horizontal, gap: 8, padding: 30, [2: CGSize(width: 400, height: 0)]) == 460)
+    @Test func `Tab minimum uses the widest member`() {
+        let tabs = Node.container(Container(.horizontal, .tabs, [.window(1), .window(2), .window(3)]))
+        #expect(tabs.minimumExtent(.horizontal, gap: 8, padding: 30, [2: CGSize(width: 400, height: 0)]) == 400)
     }
 }

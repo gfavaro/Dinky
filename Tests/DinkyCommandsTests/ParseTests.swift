@@ -65,6 +65,18 @@ struct ParseTests {
         #expect(LayoutName.next(in: [.accordion], current: [.tiling, .accordion]) == .accordion)
     }
 
+    @Test func `Tab names and legacy aliases parse and cycle`() throws {
+        #expect(try parse("layout tabs") == .layout([.tabs]))
+        #expect(try parse("layout h_tabs v_tabs") == .layout([.hTabs, .vTabs]))
+        #expect(LayoutName.tabs.mode == .tabs)
+        #expect(LayoutName.hTabs.orientation == .horizontal)
+        #expect(LayoutName.vTabs.orientation == .vertical)
+        let current = LayoutName.describing(.tabs, axis: .horizontal, auto: false)
+        #expect(LayoutName.next(in: [.tiles, .tabs], current: current) == .tiles)
+        #expect(LayoutName.next(in: [.tiles, .accordion], current: current) == .tiles)
+        #expect(LayoutName.next(in: [.tiles, .hAccordion], current: current) == .tiles)
+    }
+
     @Test func `Layout names set mode, orientation or both`() {
         #expect(LayoutName.hAccordion.mode == .accordion)
         #expect(LayoutName.hAccordion.orientation == .horizontal)
@@ -74,7 +86,7 @@ struct ParseTests {
     }
 
     @Test func `Layout states describe the resolved axis`() {
-        #expect(LayoutName.describing(.accordion, axis: .vertical, auto: true) == [.accordion, .vertical, .vAccordion, .auto])
+        #expect(LayoutName.describing(.accordion, axis: .vertical, auto: true) == [.tabs, .vertical, .vTabs, .accordion, .vAccordion, .auto])
         #expect(LayoutName.describing(.tiles, axis: .horizontal, auto: false) == [.tiles, .horizontal, .hTiles])
     }
 

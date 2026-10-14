@@ -143,9 +143,6 @@ final class HoverFocus {
         let front = frontWindowID()
         if front != 0, coordinator.placements[front] == nil,
            coordinator.model.windows[front].map({ coordinator.isVisible($0.spaceID) }) ?? true { return nil }
-        // An accordion child other than the front one only peeks out; with `accordion-edges = false` it stays put.
-        if !config.accordionEdges, let container = coordinator.container(of: id), container.mode == .accordion,
-           container.children[container.activeIndex] != .window(id) { return nil }
         // A column scrolled partly or wholly out of view would scroll the strip under the pointer; a click does that.
         if !coordinator.isInView(id) { return nil }
         return id
@@ -200,7 +197,7 @@ private struct OnScreenWindows {
             if w[kCGWindowOwnerPID as String] as? pid_t == own {
                 // dinky is an accessory app, so a dialog of its own never makes it the front app: the front
                 // app's focused window stays a tile, and only the window list shows the dialog.
-                if AppState.shared.coordinator?.isBorderWindow(id ?? 0) != true { blocked = true }
+                if AppState.shared.coordinator?.isLayoutPanel(id ?? 0) != true { blocked = true }
                 continue
             }
             guard let id, (w[kCGWindowAlpha as String] as? Double ?? 0) > 0,

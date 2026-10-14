@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Set `[drag] drop-targets = true` to choose Tabs, Left, Right, Above, Below, or Swap while dragging a tiled window. The existing tile, fixed, and scrolling layouts remain available. Drop targets are off by default.
+- Drag a tab horizontally to reorder it, or pull it out of the strip to place its window in another layout. Tab strips show app icons, window titles, and a close button on hover. Each group uses the configured Dinky border.
+
+### Changed
+
+- Tabs replace accordion stacking. Members share a content frame below a 28-point tab strip. The `accordion`, `h_accordion`, and `v_accordion` commands remain aliases; old accordion appearance settings still load but have no effect. `list-windows` reports `h_tabs` or `v_tabs` for these groups.
+
+### Fixed
+
+- Release a tracked window from its layout if it becomes a panel or leaves the normal window layer. Hidden document windows retain their classification.
+
 ## 0.18
 
 ### Key bindings

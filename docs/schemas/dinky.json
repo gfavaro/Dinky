@@ -30,7 +30,7 @@
     },
     "default-layout": {
       "type": "string",
-      "enum": ["tiles", "dwindle", "accordion", "fixed", "scrolling"],
+      "enum": ["tiles", "dwindle", "tabs", "accordion", "fixed", "scrolling"],
       "default": "tiles",
       "description": "Workspace layout. tiles is the original name for dwindle."
     },
@@ -44,12 +44,12 @@
         "additionalProperties": false,
         "properties": {
           "tiling": { "type": "boolean" },
-          "layout": { "type": "string", "enum": ["tiles", "dwindle", "accordion", "fixed", "scrolling"] },
+          "layout": { "type": "string", "enum": ["tiles", "dwindle", "tabs", "accordion", "fixed", "scrolling"] },
           "columns": { "type": "integer", "minimum": 1, "default": 1, "description": "Reserved columns for a fixed layout." },
           "rows": { "type": "integer", "minimum": 1, "default": 1, "description": "Reserved rows for a fixed layout." },
-          "expand": { "type": "string", "enum": ["columns", "rows", "accordion"], "default": "columns", "description": "Where overflow windows go when every fixed cell is full." }
+          "expand": { "type": "string", "enum": ["columns", "rows", "tabs", "accordion"], "default": "columns", "description": "Where overflow windows go when every fixed cell is full." }
         },
-        "if": { "required": ["layout"], "properties": { "layout": { "enum": ["tiles", "dwindle", "accordion", "scrolling"] } } },
+        "if": { "required": ["layout"], "properties": { "layout": { "enum": ["tiles", "dwindle", "tabs", "accordion", "scrolling"] } } },
         "then": { "not": { "anyOf": [ { "required": ["columns"] }, { "required": ["rows"] }, { "required": ["expand"] } ] } }
       }
     },
@@ -80,19 +80,19 @@
     "accordion": {
       "type": "object",
       "additionalProperties": false,
-      "description": "The accordion layout.",
+      "description": "Legacy accordion settings, accepted without effect. Accordion layouts now use tabs.",
       "properties": {
         "padding": {
           "type": "integer",
           "minimum": 0,
           "default": 30,
-          "description": "Points by which neighbouring windows peek out."
+          "description": "Legacy setting, accepted without effect."
         },
         "orientation": {
           "type": "string",
           "enum": ["auto", "keep"],
           "default": "auto",
-          "description": "What a container's orientation becomes when it switches to accordion: auto runs along its longer side, keep keeps the orientation it had."
+          "description": "Legacy setting, accepted without effect. Tab groups preserve their orientation."
         }
       }
     },
@@ -146,7 +146,7 @@
         "accordion-edges": {
           "type": "boolean",
           "default": true,
-          "description": "Whether resting on the peeking edge of an accordion child focuses it."
+          "description": "Legacy setting, accepted without effect."
         }
       }
     },
@@ -170,6 +170,7 @@
       "additionalProperties": false,
       "description": "Dragging a tiled window with the mouse.",
       "properties": {
+        "drop-targets": { "type": "boolean", "default": false, "description": "Show directional, swap and tab drop targets for tiled windows in the same Space." },
         "placeholders": {
           "type": "boolean",
           "default": true,

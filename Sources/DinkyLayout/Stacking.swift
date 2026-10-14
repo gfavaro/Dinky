@@ -1,7 +1,7 @@
 import CoreGraphics
 
 extension Layout {
-    /// Windows to raise, back to front, so overlapping windows (accordion, fullscreen) stack as `order` says
+    /// Windows to raise, back to front, so overlapping windows (tabs, fullscreen) stack as `order` says
     /// wherever that shows. `current` is the on-screen order, front to back. Empty when it already agrees;
     /// plain tiles never overlap.
     ///
@@ -9,8 +9,8 @@ extension Layout {
     /// be in front of it are raised again: a visible flash. So raising is kept to the fewest windows from the
     /// front, only the order of two windows whose overlap shows somewhere counts (where windows above both
     /// cover it, either may be on top), and once the front window is on top nothing is raised just to fix
-    /// which background window peeks out at an edge. A focus change puts the new front window on top, so
-    /// switching windows in an accordion normally raises nothing.
+    /// which fully covered tab is above another. A focus change puts the new front window on top, so
+    /// switching tabs normally raises nothing.
     public func raises(current: [WindowID]) -> [WindowID] {
         let stack = order.filter { id in
             frames.contains { other, rect in other != id && !rect.intersection(frames[id]!).isEmpty }

@@ -50,10 +50,10 @@ struct InsertTests {
         assertRatios(ws.root.ratios, [0.4, 1.0 / 3, 0.4 * 2 / 3])
     }
 
-    @Test func `Insert into accordion is always a sibling`() {
-        var ws = workspace(2, algorithm: .dwindle(.accordion))
+    @Test func `Insert into tabs is always a sibling`() {
+        var ws = workspace(2, algorithm: .dwindle(.tabs))
         ws.insert(3)
-        #expect(shape(ws.root) == "ah[1 2 3]")
+        #expect(shape(ws.root) == "th[1 2 3]")
     }
 
     @Test func `Inserting known window is ignored`() {
@@ -103,10 +103,10 @@ struct FixedLayoutTests {
         rows.remove(3)
         #expect(rows.layout().frames[1] == rect(0, 0, 600, 900))
 
-        var stacked = workspace(8, bounds: rect(0, 0, 1200, 900), algorithm: .fixed(rows: 3, columns: 2, expand: .accordion))
+        var stacked = workspace(8, bounds: rect(0, 0, 1200, 900), algorithm: .fixed(rows: 3, columns: 2, expand: .tabs))
         #expect(stacked.windows.count == 8)
-        #expect(stacked.container(of: 7)?.mode == .accordion)
-        #expect(stacked.container(of: 8)?.mode == .accordion)
+        #expect(stacked.container(of: 7)?.mode == .tabs)
+        #expect(stacked.container(of: 8)?.mode == .tabs)
         stacked.remove(7)
         #expect(stacked.contains(8))
         stacked.remove(8)
@@ -140,16 +140,16 @@ struct FixedLayoutTests {
         ws.setAlgorithm(.fixed(rows: 3, columns: 2, expand: .columns))
         #expect(ws.focused == 1)
         #expect(ws.layout().frames[4] == rect(500, 200, 500, 200))
-        ws.setAlgorithm(.dwindle(.accordion))
+        ws.setAlgorithm(.dwindle(.tabs))
         #expect(ws.windows.count == 4)
-        #expect(ws.root.mode == .accordion)
+        #expect(ws.root.mode == .tabs)
         #expect(ws.focused == 1)
     }
 
-    @Test func `Changing dwindle to accordion reconfigures existing windows`() {
+    @Test func `Changing dwindle to tabs reconfigures existing windows`() {
         var ws = workspace(3)
-        ws.setAlgorithm(.dwindle(.accordion))
-        #expect(ws.root.mode == .accordion)
+        ws.setAlgorithm(.dwindle(.tabs))
+        #expect(ws.root.mode == .tabs)
         #expect(ws.windows.count == 3)
         ws.setAlgorithm(.dwindle(.tiles))
         #expect(ws.root.mode == .tiles)
@@ -169,7 +169,7 @@ struct FixedLayoutTests {
 
     @Test func `Empty edited tree restores the fixed template`() {
         var ws = workspace(1, bounds: rect(0, 0, 1200, 900), algorithm: .fixed(rows: 3, columns: 2, expand: .columns))
-        ws.setMode(.accordion)
+        ws.setMode(.tabs)
         #expect(!ws.isFixedTree)
         ws.remove(1)
         ws.insert(2)
@@ -246,13 +246,13 @@ struct FlattenAndModeTests {
         #expect(ws.focused == 5)
     }
 
-    @Test func `Flatten restores the configured accordion`() {
-        var ws = workspace(3, algorithm: .dwindle(.accordion))
+    @Test func `Flatten restores the configured tab layout`() {
+        var ws = workspace(3, algorithm: .dwindle(.tabs))
         ws.focus(2)
         ws.setMode(.tiles)
         ws.join(.right)
         ws.flatten()
-        #expect(shape(ws.root) == "ah[1 2 3]")
+        #expect(shape(ws.root) == "th[1 2 3]")
         #expect(ws.focused == 2)
     }
 
@@ -270,8 +270,8 @@ struct FlattenAndModeTests {
 
     @Test func `Set mode changes focused parent`() {
         var ws = workspace(3)
-        ws.setMode(.accordion)
-        #expect(shape(ws.root) == "h[1 av[2 3]]")
+        ws.setMode(.tabs)
+        #expect(shape(ws.root) == "h[1 tv[2 3]]")
     }
 }
 

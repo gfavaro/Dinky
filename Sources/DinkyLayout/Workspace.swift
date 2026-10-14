@@ -9,7 +9,9 @@ public enum TilingAlgorithm: Equatable, Sendable {
 }
 
 public enum FixedExpansion: Equatable, Sendable {
-    case rows, columns, accordion
+    case rows, columns, tabs
+
+    public static let accordion = FixedExpansion.tabs
 }
 
 /// One Space's tiling state: the tree, focus, fullscreen and the geometry settings used to lay it out.
@@ -18,8 +20,7 @@ public struct Workspace: Equatable, Sendable {
     public var bounds: CGRect
     public var gaps: Gaps
     public var accordionPadding: CGFloat
-    /// Whether a container switching to accordion follows its longer side (`auto`), unless a `layout` command
-    /// chose its orientation.
+    /// Legacy setting, accepted without effect. Tabs keep their container's orientation.
     public var autoOrientAccordions: Bool
     public private(set) var algorithm: TilingAlgorithm
     /// The tree. The root is always a container, possibly empty.
@@ -44,8 +45,7 @@ public struct Workspace: Equatable, Sendable {
     /// The algorithm a `layout` command switched to, kept over the config's. Nil follows the config.
     public var chosenAlgorithm: TilingAlgorithm?
 
-    /// An empty workspace laid out by `algorithm`. A dwindle accordion root with `autoOrientAccordions` starts
-    /// `auto`, as a container switched to accordion would, so it runs top to bottom on a tall display.
+    /// An empty workspace laid out by `algorithm`. Legacy accordion settings have no visual effect.
     public init(bounds: CGRect, gaps: Gaps = .zero, accordionPadding: CGFloat = 30, autoOrientAccordions: Bool = false,
                 algorithm: TilingAlgorithm = .dwindle(.tiles)) {
         self.bounds = bounds
@@ -55,7 +55,7 @@ public struct Workspace: Equatable, Sendable {
         self.algorithm = algorithm
         switch algorithm {
         case .dwindle(let mode):
-            root = Container(mode == .accordion && autoOrientAccordions ? .auto : .horizontal, mode)
+            root = Container(.horizontal, mode)
         case .fixed(let rows, let columns, _):
             precondition(rows > 0 && columns > 0)
             root = Self.fixedRoot(rows: rows, columns: columns)
@@ -93,8 +93,8 @@ public struct Workspace: Equatable, Sendable {
         let parentPath = Array(path.dropLast()), index = path.last!
         let joins = axisOfContainer(at: parentPath, in: layout) == axis || root.container(at: parentPath).children.count == 1
         root.modify(at: parentPath) { parent in
-            if parent.children.count == 1, parent.orientation != .auto { parent.orientation = ContainerOrientation(axis) }
-            if joins || parent.mode == .accordion {
+            if parent.mode == .tiles, parent.children.count == 1, parent.orientation != .auto { parent.orientation = ContainerOrientation(axis) }
+            if joins || parent.mode == .tabs {
                 parent.insert(.window(id), at: index + 1)
             } else {
                 parent.replace(at: index, with: .container(Container(ContainerOrientation(axis), .tiles, [.window(focused), .window(id)])))
@@ -129,9 +129,10 @@ public struct Workspace: Equatable, Sendable {
 
     mutating func removeFixedWindow(at path: [Int]) {
         let cell = Array(path.prefix(2))
-        if path.count == 3, case .container(let stack) = root.node(at: cell) {
-            root.modify(at: cell) { $0.remove(at: path[2]) }
-            if stack.children.count == 2, case .container(let remaining) = root.node(at: cell) {
+        if path.count > 2 {
+            root.modify(at: Array(path.dropLast())) { $0.remove(at: path.last!) }
+            root.modify(at: cell) { $0.normalize() }
+            if case .container(let remaining) = root.node(at: cell), remaining.children.count == 1 {
                 root.modify(at: [cell[0]]) { $0.replace(at: cell[1], with: remaining.children[0]) }
             }
         } else {
@@ -153,7 +154,7 @@ public struct Workspace: Equatable, Sendable {
                 guard root.children.indices.allSatisfy({ root.node(at: [$0, last]).windows.isEmpty }) else { break }
                 for column in root.children.indices { root.modify(at: [column]) { $0.remove(at: last) } }
             }
-        case .accordion: break
+        case .tabs: break
         }
     }
 
@@ -174,13 +175,8 @@ public struct Workspace: Equatable, Sendable {
         return root.children.allSatisfy { node in
             guard case .container(let column) = node, column.orientation == .vertical,
                   column.mode == .tiles, column.children.count == firstColumn.children.count else { return false }
-            return column.children.allSatisfy { cell in
-                switch cell {
-                case .window: true
-                case .container(let c): c.children.isEmpty || (c.mode == .accordion
-                    && c.children.allSatisfy { if case .window = $0 { true } else { false } })
-                }
-            }
+            // A cell may contain any user-created split or tab group.
+            return true
         }
     }
 
@@ -202,13 +198,15 @@ public struct Workspace: Equatable, Sendable {
         case .rows:
             for column in 0..<columns { root.modify(at: [column]) { $0.insert(Self.emptyCell, at: rows) } }
             root.modify(at: [0]) { $0.replace(at: rows, with: .window(id)) }
-        case .accordion:
+        case .tabs:
             let cell = [columns - 1, rows - 1]
             switch root.node(at: cell) {
             case .window(let existing):
-                root.modify(at: [cell[0]]) { $0.replace(at: cell[1], with: .container(Container(.horizontal, .accordion, [.window(existing), .window(id)]))) }
-            case .container:
+                root.modify(at: [cell[0]]) { $0.replace(at: cell[1], with: .container(Container(.horizontal, .tabs, [.window(existing), .window(id)]))) }
+            case .container(let c) where c.mode == .tabs:
                 root.modify(at: cell) { $0.insert(.window(id), at: $0.children.count) }
+            case let node:
+                root.modify(at: [cell[0]]) { $0.replace(at: cell[1], with: .container(Container(.horizontal, .tabs, [node, .window(id)]))) }
             }
         }
         return true
@@ -233,7 +231,7 @@ public struct Workspace: Equatable, Sendable {
         let ids = isFixedTree ? fixedWindows : windows
         switch algorithm {
         case .dwindle(let mode):
-            root = Container(mode == .accordion && autoOrientAccordions ? .auto : .horizontal, mode, ids.map(Node.window))
+            root = Container(.horizontal, mode, ids.map(Node.window))
         case .fixed(let rows, let columns, let expand):
             root = Self.fixedRoot(rows: rows, columns: columns)
             for id in ids { _ = insertIntoFixed(id, expand: expand) }
@@ -260,7 +258,7 @@ public struct Workspace: Equatable, Sendable {
         rebuild()
     }
 
-    /// Focus a window and mark it most recent along its path, so accordions show it on top.
+    /// Focus a window and mark it most recent along its path, so tabs select it.
     /// Ends fullscreen unless it is the fullscreen window.
     public mutating func focus(_ id: WindowID) {
         guard let path = root.path(of: id) else { return }
@@ -361,15 +359,13 @@ public struct Workspace: Equatable, Sendable {
     public mutating func setOrientation(_ orientation: ContainerOrientation) { setLayout(nil, orientation) }
 
     /// Set the mode, the orientation or both of the focused window's parent container, then tidy the tree once,
-    /// so the container is not merged into its parent halfway. With `autoOrientAccordions`, a container becoming
-    /// an accordion turns `auto` unless a command chose its orientation.
+    /// so the container is not merged into its parent halfway. Switching modes preserves its orientation.
     public mutating func setLayout(_ mode: LayoutMode?, _ orientation: ContainerOrientation?) {
         isFullscreen = false
         // The strip itself stays a row of columns; a window alone in its column has no container to change.
         guard let focused, let path = root.path(of: focused), !(isScrolling && path.count == 1) else { return }
         root.modify(at: Array(path.dropLast())) { c in
             if let mode {
-                if mode == .accordion, c.mode != .accordion, autoOrientAccordions, !c.orientationChosen { c.orientation = .auto }
                 c.mode = mode
             }
             if let orientation {
@@ -389,8 +385,18 @@ public struct Workspace: Equatable, Sendable {
     /// Scrolled-out windows are parked where macOS lets them be, see `parked(_:)`.
     public func layout() -> Layout {
         var result = tiledLayout()
-        if isScrolling { result.frames = result.frames.mapValues(parked) }
+        if isScrolling {
+            result.visibleWindows = result.visibleWindows.filter {
+                guard let frame = result.frames[$0] else { return false }
+                return frame.minX >= bounds.minX - 1 && frame.maxX <= bounds.maxX + 1
+            }
+            result.frames = result.frames.mapValues(parked)
+            // Parked columns keep their existing behavior, but must not show floating tab strips.
+            result.tabGroups.removeAll { $0.frame.minX < bounds.minX || $0.frame.maxX > bounds.maxX }
+        }
         if let fullscreen {
+            result.tabGroups = []
+            result.visibleWindows = [fullscreen]
             result.frames[fullscreen] = gaps.inset(bounds)
             result.order = [fullscreen] + result.order.filter { $0 != fullscreen }
         }
@@ -407,6 +413,20 @@ public struct Workspace: Equatable, Sendable {
 
     /// Tidy the tree after an edit, and unwrap a root whose only child is a container.
     mutating func normalize() {
+        if case .fixed = algorithm, isFixedTree {
+            for column in root.children.indices {
+                for row in root.container(at: [column]).children.indices {
+                    let path = [column, row]
+                    if case .container = root.node(at: path) {
+                        root.modify(at: path) { $0.normalize() }
+                        if case .container(let c) = root.node(at: path), c.children.count == 1 {
+                            root.modify(at: [column]) { $0.replace(at: row, with: c.children[0]) }
+                        }
+                    }
+                }
+            }
+            return
+        }
         root.normalize()
         // The strip stays the root even with one column left.
         if !isScrolling, root.children.count == 1, case .container(let only) = root.children[0] { root = only }

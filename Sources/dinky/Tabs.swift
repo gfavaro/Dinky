@@ -19,7 +19,7 @@ extension Coordinator {
     /// window's frame, so the newcomer is held out of the tree until the tile's window is ordered out or
     /// `settleTab` gives up on it.
     private func tab(replacedBy window: Window, in key: UInt64) -> WindowID? {
-        workspaces[key]?.windows.first { id in
+        workspaces[key]?.layout().order.first { id in
             guard id != window.id, let other = model.windows[id] else { return false }
             return other.pid == window.pid && other.frame.isClose(to: window.frame, within: 1)
         }

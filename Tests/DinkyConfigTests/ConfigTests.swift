@@ -61,7 +61,7 @@ struct ConfigTests {
         #expect(!config.followAppActivation)
         #expect(!config.floatWindowsWithoutFullscreen)
         assertError("workspaces = 0\n", path: "workspaces", line: 1, contains: "at least 1")
-        assertError("default-layout = 'stack'\n", path: "default-layout", line: 1, contains: "'tiles', 'dwindle', 'accordion', 'fixed', 'scrolling'")
+        assertError("default-layout = 'stack'\n", path: "default-layout", line: 1, contains: "'tiles', 'dwindle', 'tabs', 'accordion', 'fixed', 'scrolling'")
     }
 
     @Test func `Workspace layouts`() throws {
@@ -102,7 +102,7 @@ struct ConfigTests {
         let oneByOne = try Config.parse("[workspace.2]\nlayout = 'fixed'\n")
         #expect(oneByOne.settings(forWorkspace: 2).columns == 1)
         #expect(oneByOne.settings(forWorkspace: 2).rows == 1)
-        assertError("[workspace.2]\nlayout = 'fixed'\nexpand = 'diagonal'\n", path: "workspace.2.expand", line: 3, contains: "'rows', 'columns', 'accordion'")
+        assertError("[workspace.2]\nlayout = 'fixed'\nexpand = 'diagonal'\n", path: "workspace.2.expand", line: 3, contains: "'rows', 'columns', 'tabs', 'accordion'")
     }
 
     @Test func `Unknown top-level key fails`() {

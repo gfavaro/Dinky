@@ -25,7 +25,7 @@ permalink: /configuration/
 |---|---|---|
 | `start-at-login` | `true` | Register as a login item. |
 | `workspaces` | `5` | Workspaces across all displays, one native Space each. dinky creates and removes Spaces to match. |
-| `default-layout` | `'tiles'` | `'tiles'` (the existing dwindle layout), `'dwindle'`, `'accordion'`, `'fixed'`, or `'scrolling'`. |
+| `default-layout` | `'tiles'` | `'tiles'` (the existing dwindle layout), `'dwindle'`, `'tabs'`, `'fixed'`, or `'scrolling'`. |
 | `default-tiling` | `true` | Set `false` to leave workspaces untiled unless overridden. |
 | `follow-app-activation` | `true` | Cmd-Tab and Dock clicks switch Spaces the fast way. Needs the macOS "switch to a Space with open windows" setting off. |
 | `float-windows-without-fullscreen` | `true` | Float windows that can't go full screen, such as Finder's copy progress, About This Mac and Calculator. Terminals and editors that can hide their title bar still tile. A `layout tiling` rule tiles a window anyway. |
@@ -54,7 +54,7 @@ window occupies one sixth of the workspace, and an empty cell stays empty when
 another window closes. New windows fill holes first, left to right, top to bottom.
 
 When all cells are occupied, `expand` chooses what happens next: `'columns'`
-(default) adds a column, `'rows'` adds a row, or `'accordion'` stacks overflow
+(default) adds a column, `'rows'` adds a row, or `'tabs'` groups overflow into tabs
 windows in the last cell. Expansion resizes existing cells but does not rearrange
 their positions. An overflow row or column disappears once empty; reserved
 template cells remain. A tree command can still edit the layout; if it changes the
@@ -71,7 +71,7 @@ tiling = true
 layout = 'fixed'
 columns = 2
 rows = 3
-# expand = 'columns' # or 'rows' or 'accordion'
+# expand = 'columns' # or 'rows' or 'tabs'
 
 [[rules]]
 app-id = 'com.mitchellh.ghostty'
@@ -79,9 +79,8 @@ run = 'move-window-to-workspace 2'
 ```
 
 `rows`, `columns`, and `expand` are only allowed with a fixed layout; with any
-other they are a config error. `layout = 'accordion'`
-remains available; conceptually it resembles a 1×1 fixed template with accordion
-overflow, but keeps the existing accordion orientation behavior. Workspace
+other they are a config error. `layout = 'tabs'`
+creates a tabbed workspace. The old `'accordion'` spelling selects tabs too. Workspace
 numbering starts at 1.
 
 ## Scrolling
@@ -111,12 +110,12 @@ layout = 'scrolling'
 ```
 
 `layout scrolling` switches the focused window's workspace to scrolling on the fly, and
-`layout tiles` or `accordion` switches it back to its tree. The switch holds
+`layout tiles` or `tabs` switches it back to its tree. The switch holds
 until you switch again. To cycle all three on one key:
 
 ```toml
 [mode.main]
-ctrl-alt-cmd-s = 'layout tiles accordion scrolling'
+ctrl-alt-cmd-s = 'layout tiles tabs scrolling'
 ```
 
 ## `[scrolling]`
@@ -129,14 +128,31 @@ ctrl-alt-cmd-s = 'layout tiles accordion scrolling'
 
 </div>
 
-## `[accordion]`
+## Tabs and legacy `[accordion]` settings
+
+Tabs replace accordion stacking. Click a tab to select its window. Windows from
+different apps can share a group; all members stay in the same native Space.
+Tabs show the app icon and window title, with the app name as a title fallback. Drag a tab
+horizontally to reorder it. Pull it up or down out of the strip to show the drop
+targets when `[drag] drop-targets = true`, then release over a target to place
+its window there. With drop targets off, releasing over another tile swaps the
+windows. Escape cancels.
+The horizontal tab bar reserves 28 points above the shared content frame.
+The strip uses native AppKit tab-style contrast and adapts to the system appearance.
+Hover a tab to show its close button; closing uses that window's own close action,
+including any save prompt from its app. With borders enabled, one border surrounds
+the bar and active window, using Dinky's configured colors and width;
+inactive members do not draw overlapping borders.
+Switching back to tiles preserves the group's ratios and orientation.
+
+Old accordion settings remain accepted so existing configurations load.
 
 <div class="wide-table" markdown="1">
 
 | Key | Default | |
 |---|---|---|
-| `padding` | `30` | Points the neighbours peek out by. |
-| `orientation` | `'auto'` | On switching to accordion, `'auto'` runs along the container's longer side; `'keep'` keeps its orientation. An orientation set with `layout` is always kept. |
+| `padding` | `30` | Legacy setting; accepted without effect. |
+| `orientation` | `'auto'` | Legacy setting; accepted without effect. Tabs preserve the container's orientation. |
 
 </div>
 
@@ -204,7 +220,7 @@ gaps.outer.top = 44
 |---|---|---|
 | `enabled` | `false` | Focus the managed window the pointer rests on. Ignored while a button is down or a menu is open, and until the pointer moves to another window after Cmd-Tab or a Space change. |
 | `delay-ms` | `100` | How long the pointer must rest. |
-| `accordion-edges` | `true` | Resting on a peeking accordion edge focuses that window. |
+| `accordion-edges` | `true` | Legacy setting; accepted without effect. |
 
 </div>
 
@@ -225,10 +241,21 @@ Drag a tiled window's edge to resize it; the other tiles make room, and in the
 scrolling layout its column takes the new width. Drag the window itself and
 drop it on another tile to swap the two; dropped anywhere else, it goes back.
 
+Set `drop-targets = true` to show six choices over a destination: left, right,
+above, below, swap, and tabs. Release over a choice to apply it. Escape cancels.
+Only tiled windows in the same native Space participate. Hover does not reflow
+windows, and resizing a window still updates its manual size.
+
+In a fixed grid, splits and tabs stay inside the destination cell. In scrolling,
+left/right creates a neighbouring column at the destination column’s width;
+above/below splits inside the column, and tabs share that column. Dropping beside
+a tab group splits beside the group; dropping on Tabs joins it.
+
 <div class="wide-table" markdown="1">
 
 | Key | Default | |
 |---|---|---|
+| `drop-targets` | `false` | Show directional, swap, and tab drop targets. |
 | `placeholders` | `true` | While you drag a tiled window, outline the tile it came from and the tile it will swap with. |
 
 </div>
@@ -331,7 +358,7 @@ The default `alt-` bindings take over Option-letter characters; set
 
 start-at-login = true
 workspaces = 5                  # across all displays, one native Space each
-default-layout = 'tiles'        # tiles (dwindle) | dwindle | accordion | fixed | scrolling
+default-layout = 'tiles'        # tiles (dwindle) | dwindle | tabs | fixed | scrolling
 default-tiling = true           # false leaves workspaces untiled unless overridden
 follow-app-activation = true    # Cmd-Tab and Dock clicks switch Spaces the fast way
 float-windows-without-fullscreen = true   # progress windows, About, Calculator and the like float
@@ -344,11 +371,11 @@ float-windows-without-fullscreen = true   # progress windows, About, Calculator 
 # layout = 'fixed'
 # columns = 2
 # rows = 3
-# expand = 'columns'           # columns | rows | accordion (overflow in last cell)
+# expand = 'columns'           # columns | rows | tabs (overflow in last cell)
 
 [accordion]
-padding = 30                    # points the neighbours peek out by
-orientation = 'auto'            # auto: run along the container's longer side | keep
+padding = 30                    # legacy setting; accepted without effect
+orientation = 'auto'            # legacy setting; accepted without effect
 
 [scrolling]
 column-width = 0.49             # a new column's share of the display; a lone column fills it
@@ -377,13 +404,14 @@ exclude-apps = []               # bundle IDs whose windows get no border
 [focus-follows-mouse]
 enabled = false
 delay-ms = 100                  # how long the pointer rests on a window before it takes focus
-accordion-edges = true          # resting on a peeking accordion edge focuses that window
+accordion-edges = true          # legacy setting; accepted without effect
 
 [animations]
 enabled = true                  # windows glide to their tiles; off while Reduce Motion is on
 duration-ms = 150               # roughly how long a window takes to arrive
 
 [drag]
+drop-targets = false             # show directional, swap and tab targets during a drag
 placeholders = true             # outline where a dragged tile came from and the tile it will swap with
 
 # Which key of each pair bindings answer to: both | left | right. With alt = 'left',
@@ -441,7 +469,7 @@ alt-minus = 'resize smart -50'
 alt-equal = 'resize smart +50'
 alt-f = 'fullscreen'
 alt-shift-f = 'layout floating tiling'
-alt-comma = 'layout accordion'
+alt-comma = 'layout tabs'
 alt-slash = 'layout tiles'
 alt-shift-n = 'move-window-to-display next'
 alt-shift-semicolon = 'mode service'

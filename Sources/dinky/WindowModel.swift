@@ -27,7 +27,8 @@ struct Window {
 
     // Tileable: normal layer, on screen, visible (not minimized), a document window rather than a sheet,
     // panel or popup.
-    var isNormal: Bool { level == 0 && isOrderedIn && isVisible && isDocument }
+    var isTileableKind: Bool { level == 0 && isDocument }
+    var isNormal: Bool { isTileableKind && isOrderedIn && isVisible }
 }
 
 struct WindowEvent {

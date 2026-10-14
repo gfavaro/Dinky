@@ -109,6 +109,7 @@ struct SchemaTests {
         duration-ms = 100
 
         [drag]
+        drop-targets = true
         placeholders = false
 
         [modifiers]

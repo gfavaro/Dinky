@@ -77,7 +77,8 @@ public enum ResizeDimension: String, Equatable, Sendable {
 /// A state for `layout`, as in AeroSpace: a mode, an orientation, both, or floating or tiling for the window;
 /// or scrolling for its workspace.
 public enum LayoutName: String, Equatable, Sendable {
-    case tiles, accordion, horizontal, vertical, auto
+    case tiles, tabs, accordion, horizontal, vertical, auto
+    case hTabs = "h_tabs", vTabs = "v_tabs"
     case hTiles = "h_tiles", vTiles = "v_tiles", hAccordion = "h_accordion", vAccordion = "v_accordion"
     case floating, tiling, scrolling
 
@@ -92,7 +93,7 @@ public enum LayoutName: String, Equatable, Sendable {
     public var mode: LayoutMode? {
         switch self {
         case .tiles, .hTiles, .vTiles: .tiles
-        case .accordion, .hAccordion, .vAccordion: .accordion
+        case .tabs, .hTabs, .vTabs, .accordion, .hAccordion, .vAccordion: .tabs
         default: nil
         }
     }
@@ -103,16 +104,17 @@ public enum LayoutName: String, Equatable, Sendable {
         let horizontal = axis == .horizontal
         let both: LayoutName = switch mode {
         case .tiles: horizontal ? .hTiles : .vTiles
-        case .accordion: horizontal ? .hAccordion : .vAccordion
+        case .tabs: horizontal ? .hTabs : .vTabs
         }
-        return [mode == .tiles ? .tiles : .accordion, horizontal ? .horizontal : .vertical, both] + (auto ? [.auto] : [])
+        return [mode == .tiles ? .tiles : .tabs, horizontal ? .horizontal : .vertical, both]
+            + (mode == .tabs ? [.accordion, horizontal ? .hAccordion : .vAccordion] : []) + (auto ? [.auto] : [])
     }
 
     /// The container orientation this sets, nil if it leaves the orientation alone.
     public var orientation: ContainerOrientation? {
         switch self {
-        case .horizontal, .hTiles, .hAccordion: .horizontal
-        case .vertical, .vTiles, .vAccordion: .vertical
+        case .horizontal, .hTiles, .hTabs, .hAccordion: .horizontal
+        case .vertical, .vTiles, .vTabs, .vAccordion: .vertical
         case .auto: .auto
         default: nil
         }

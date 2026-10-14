@@ -5,8 +5,8 @@ extension Workspace {
     /// Smallest share a window can be resized down to.
     static let minimumRatio = 0.1
 
-    /// The window in `direction` from `id`. Uses a virtual layout where accordions are split like tiles,
-    /// so stacked accordion children still have a left and right. Ties go to the most recently focused window.
+    /// The window in `direction` from `id`. Uses a virtual layout where tab groups are split like tiles,
+    /// so tab members still have a left and right. Ties go to the most recently focused window.
     public func neighbor(of id: WindowID, _ direction: Direction) -> WindowID? {
         var layout = Layout()
         root.layout(in: bounds, gaps: .zero, padding: 0, virtual: true, into: &layout)
@@ -33,13 +33,18 @@ extension Workspace {
         guard first != second, let a = root.path(of: first), let b = root.path(of: second) else { return false }
         root.modify(at: Array(a.dropLast())) { $0.replace(at: a.last!, with: .window(second)) }
         root.modify(at: Array(b.dropLast())) { $0.replace(at: b.last!, with: .window(first)) }
+        if isScrolling {
+            let share = columnWidths[first]
+            columnWidths[first] = columnWidths[second]
+            columnWidths[second] = share
+        }
         if let focused { focus(focused) }
         return true
     }
 
     /// Move the focused window one step in `direction`, AeroSpace style: swap with a sibling window, enter a
     /// sibling container, or leave the container at its edge. At the workspace edge, wraps the root in a new
-    /// container along that axis, so a window leaves a root accordion for a tile beside it; if the root already
+    /// container along that axis, so a window leaves a root tab group for a tile beside it; if the root already
     /// tiles that way, does nothing. The scrolling layout moves columns instead, see `moveInStrip`.
     @discardableResult
     public mutating func move(_ direction: Direction) -> Bool {
@@ -85,7 +90,7 @@ extension Workspace {
             var outer = Array(path.prefix(depth + 1))
             detach(path, adjusting: &outer)
             root.modify(at: Array(outer.dropLast())) { $0.insert(.window(focused), at: outer.last! + (forward ? 1 : 0)) }
-        } else if !isScrolling, axisOfContainer(at: [], in: layout) != axis || (root.mode == .accordion && root.children.count > 1) {
+        } else if !isScrolling, axisOfContainer(at: [], in: layout) != axis || (root.mode == .tabs && root.children.count > 1) {
             root.modify(at: parentPath) { $0.remove(at: index) }
             root = Container(ContainerOrientation(axis), .tiles, [.container(root)])
             root.insert(.window(focused), at: forward ? 1 : 0)

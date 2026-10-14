@@ -50,6 +50,12 @@ let package = Package(
             dependencies: ["DinkyConfig"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        // AppKit regressions use offscreen panels and never control user windows.
+        .testTarget(
+            name: "DinkyAppTests",
+            dependencies: ["dinky", "DinkyLayout"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         // The app and CLI.
         .executableTarget(
             name: "dinky",

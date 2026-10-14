@@ -45,14 +45,14 @@ extension Coordinator {
         placements[id]?.space.flatMap { workspaces[$0]?.containerAxis(of: id) }
     }
 
-    /// AeroSpace's name for how a window is laid out: `h_tiles`, `v_tiles`, `h_accordion` or `v_accordion`
+    /// AeroSpace's name for how a window is laid out: `h_tiles`, `v_tiles`, `h_tabs` or `v_tabs`
     /// from its container (an `auto` one by the axis it follows now), `fullscreen` for dinky's fullscreen,
     /// `floating` for any window that is not tiled.
     func layoutName(of id: WindowID) -> String {
         guard let key = placements[id]?.space, let workspace = workspaces[key],
               let container = workspace.container(of: id), let axis = workspace.containerAxis(of: id) else { return "floating" }
         if workspace.fullscreen == id { return "fullscreen" }
-        return (axis == .horizontal ? "h_" : "v_") + (container.mode == .accordion ? "accordion" : "tiles")
+        return (axis == .horizontal ? "h_" : "v_") + (container.mode == .tabs ? "tabs" : "tiles")
     }
 
     /// Runs a command on the tree of a window (the focused one by default), focused in that tree, and applies

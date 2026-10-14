@@ -17,7 +17,7 @@ brew install --cask mikker/tap/dinky
 Open dinky and grant Accessibility when asked. Windows tile as they open.
 
 - `dinky workspace 3`: Switch to workspace 3.
-- `dinky layout accordion`: Stack the focused container.
+- `dinky layout tabs`: Show the focused container as a tabbed group.
 - `dinky doctor`: Check the config, the macOS settings dinky needs, and that no other tiler is running.
 
 Learn more:

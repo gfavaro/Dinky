@@ -19,9 +19,12 @@ public enum ContainerOrientation: Equatable, Sendable {
     public init(_ axis: Orientation) { self = axis == .horizontal ? .horizontal : .vertical }
 }
 
-/// How a container shows its children: side by side, or stacked with neighbours peeking out.
+/// How a container shows its children: side by side, or as a tabbed group.
 public enum LayoutMode: Equatable, Sendable {
-    case tiles, accordion
+    case tiles, tabs
+
+    /// Source compatibility: accordion now displays tabs.
+    public static let accordion = LayoutMode.tabs
 }
 
 /// A direction for focus, swap, move and join-with.
@@ -61,11 +64,11 @@ public indirect enum Node: Equatable, Sendable {
 public struct Container: Equatable, Sendable {
     public var orientation: ContainerOrientation
     public var mode: LayoutMode
-    /// Whether a `layout` command chose the orientation, so switching to accordion keeps it.
+    /// Whether a `layout` command chose the orientation, so switching to tabs keeps it.
     public var orientationChosen = false
     public private(set) var children: [Node] = []
     public private(set) var ratios: [Double] = []
-    /// Index of the most recently focused child. Drives accordion stacking.
+    /// Index of the most recently focused child. Selects the visible tab.
     public internal(set) var active = 0
 
     /// A container with the given children, if any, and equal ratios.
@@ -100,6 +103,13 @@ public struct Container: Equatable, Sendable {
     /// Replace the child at `index`, keeping its ratio.
     mutating func replace(at index: Int, with node: Node) {
         children[index] = node
+    }
+
+    /// Reorder a child without changing its saved share.
+    mutating func reorder(from: Int, to: Int) {
+        let node = children.remove(at: from), ratio = ratios.remove(at: from)
+        children.insert(node, at: to)
+        ratios.insert(ratio, at: to)
     }
 
     /// Set all ratios at once. Callers keep them summing to 1.

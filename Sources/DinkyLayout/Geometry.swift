@@ -37,22 +37,52 @@ public struct Gaps: Equatable, Sendable {
     }
 }
 
+/// A visible tab strip. Each tab selects the most recently focused leaf of its child subtree.
+public struct TabGroup: Equatable, Sendable {
+    public static let barHeight: CGFloat = 28
+    public let frame: CGRect
+    public let tabs: [WindowID]
+    public let selected: WindowID
+    public let windows: [WindowID]
+
+    public var barFrame: CGRect {
+        CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: min(Self.barHeight, frame.height))
+    }
+}
+
 /// The result of a layout pass.
 public struct Layout: Equatable, Sendable {
     /// Frame per window, top-left origin.
     public var frames: [WindowID: CGRect] = [:]
     /// Windows front to back: the first should be frontmost.
     public var order: [WindowID] = []
+    public var tabGroups: [TabGroup] = []
+    /// Leaves that may be hit by a drag; inactive tab members remain in frames and order.
+    public var visibleWindows: Set<WindowID> = []
     /// The rectangle each container was laid out in, by its path from the root. Empty containers included.
     var containerRects: [[Int]: CGRect] = [:]
+
+    /// One outline around each outer tab group, never around its covered members.
+    public var tabBorderFrames: [WindowID: CGRect] {
+        var result: [WindowID: CGRect] = [:], covered: Set<WindowID> = []
+        for group in tabGroups where covered.isDisjoint(with: group.windows) {
+            result[group.selected] = group.frame
+            covered.formUnion(group.windows)
+        }
+        return result
+    }
+
+    public var suppressedTabBorders: Set<WindowID> {
+        Set(tabGroups.flatMap(\.windows)).subtracting(tabBorderFrames.keys)
+    }
 
     public init(frames: [WindowID: CGRect] = [:], order: [WindowID] = []) {
         self.frames = frames
         self.order = order
     }
 
-    /// Equal when windows get the same frames in the same order; container rects follow from those.
-    public static func == (a: Layout, b: Layout) -> Bool { a.frames == b.frames && a.order == b.order }
+    /// Frames, stacking, visible members and tab strips determine the applied layout.
+    public static func == (a: Layout, b: Layout) -> Bool { a.frames == b.frames && a.order == b.order && a.tabGroups == b.tabGroups && a.visibleWindows == b.visibleWindows }
 }
 
 extension Container {
@@ -66,23 +96,33 @@ extension Container {
     }
 
     /// Lay out this container in `rect`: tiles split by ratios with the inner gap for its axis between siblings,
-    /// accordion children overlap with neighbours peeking out by `padding`. `virtual` lays accordions out as tiles.
+    /// tab children share a content frame below their tab strip. `virtual` lays tabs out as tiles.
     /// `minimums` are sizes windows refused to go below; tiles grow to them when their siblings can give the space.
     /// Records `rect` as the rect of the container at `path`.
     func layout(in rect: CGRect, gaps: Gaps, padding: CGFloat, minimums: [WindowID: CGSize] = [:],
-                virtual: Bool = false, path: [Int] = [], into result: inout Layout) {
+                virtual: Bool = false, visible: Bool = true, path: [Int] = [], into result: inout Layout) {
         result.containerRects[path] = rect
         let tiled = mode == .tiles || virtual, axis = axis(in: rect), gap = gaps.inner(axis)
+        let hasTabs = !tiled && children.count > 1
+        let bar = hasTabs ? min(TabGroup.barHeight, max(0, rect.height)) : 0
+        let content = CGRect(x: rect.minX, y: rect.minY + bar, width: rect.width, height: max(0, rect.height - bar))
         let rects = tiled
             ? tileRects(in: rect, gap: gap, minimums: children.map { $0.minimumExtent(axis, gap: gap, padding: padding, minimums) })
-            : accordionRects(in: rect, padding: padding)
+            : Array(repeating: content, count: children.count)
+        if hasTabs, visible {
+            let tabs = children.compactMap { $0.mostRecentWindow }
+            if let selected = children[activeIndex].mostRecentWindow {
+                result.tabGroups.append(TabGroup(frame: rect, tabs: tabs, selected: selected, windows: children.flatMap(\.windows)))
+            }
+        }
         for i in stackingOrder {
             switch children[i] {
             case .window(let id):
                 result.frames[id] = rects[i]
                 result.order.append(id)
+                if visible && (tiled || i == activeIndex) { result.visibleWindows.insert(id) }
             case .container(let c):
-                c.layout(in: rects[i], gaps: gaps, padding: padding, minimums: minimums, virtual: virtual,
+                c.layout(in: rects[i], gaps: gaps, padding: padding, minimums: minimums, virtual: virtual, visible: visible && (tiled || i == activeIndex),
                          path: path + [i], into: &result)
             }
         }
@@ -111,25 +151,6 @@ extension Container {
                 : CGRect(x: rect.minX, y: a, width: rect.width, height: b - a)
         }
     }
-
-    /// Accordion rects: each child gets `rect` shrunk along the axis so neighbours of the active child peek out.
-    /// Adapted from AeroSpace's layoutAccordion (MIT, github.com/nikitabobko/AeroSpace).
-    func accordionRects(in rect: CGRect, padding p: CGFloat) -> [CGRect] {
-        let last = children.count - 1, active = activeIndex, horizontal = axis(in: rect) == .horizontal
-        return children.indices.map { i in
-            let (lead, trail): (CGFloat, CGFloat) = switch i {
-            case 0 where last == 0: (0, 0)
-            case 0: (0, p)
-            case last: (p, 0)
-            case active - 1: (0, 2 * p)
-            case active + 1: (2 * p, 0)
-            default: (p, p)
-            }
-            return horizontal
-                ? CGRect(x: rect.minX + lead, y: rect.minY, width: rect.width - lead - trail, height: rect.height)
-                : CGRect(x: rect.minX, y: rect.minY + lead, width: rect.width, height: rect.height - lead - trail)
-        }
-    }
 }
 
 /// `sizes` with every entry raised to its minimum, the difference taken from the others in proportion to
@@ -150,6 +171,13 @@ func fit(_ sizes: [CGFloat], minimums: [CGFloat], total: CGFloat) -> [CGFloat] {
 }
 
 extension Node {
+    var mostRecentWindow: WindowID? {
+        switch self {
+        case .window(let id): return id
+        case .container(let c): return c.mostRecentWindow
+        }
+    }
+
     /// The smallest extent along `axis` this subtree can take without a window going below its minimum.
     /// An `auto` container counts as running across `axis`: a tile's longer side is usually across its parent's axis.
     func minimumExtent(_ axis: Orientation, gap: CGFloat, padding: CGFloat, _ minimums: [WindowID: CGSize]) -> CGFloat {
@@ -159,10 +187,11 @@ extension Node {
             return axis == .horizontal ? size.width : size.height
         case .container(let c):
             let each = c.children.map { $0.minimumExtent(axis, gap: gap, padding: padding, minimums) }
+            if c.mode == .tabs {
+                return (each.max() ?? 0) + (axis == .vertical && each.count > 1 ? TabGroup.barHeight : 0)
+            }
             guard c.orientation == ContainerOrientation(axis), !each.isEmpty else { return each.max() ?? 0 }
-            return c.mode == .tiles
-                ? each.reduce(0, +) + gap * CGFloat(each.count - 1)
-                : each.max()! + padding * CGFloat(min(each.count - 1, 2))
+            return each.reduce(0, +) + gap * CGFloat(each.count - 1)
         }
     }
 }

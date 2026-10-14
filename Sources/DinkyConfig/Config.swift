@@ -132,11 +132,11 @@ public struct Config: Equatable {
 }
 
 public enum LayoutKind: String, CaseIterable {
-    case tiles, dwindle, accordion, fixed, scrolling
+    case tiles, dwindle, tabs, accordion, fixed, scrolling
 }
 
 public enum ExpansionKind: String, CaseIterable {
-    case rows, columns, accordion
+    case rows, columns, tabs, accordion
 }
 
 /// A workspace's tiling settings: a `[workspace.N]` table with omitted keys taken from the top-level settings.
@@ -177,14 +177,13 @@ extension Config {
     }
 }
 
-/// What a container's orientation becomes when it switches to accordion: `auto`, following its longer side,
-/// or `keep`, the orientation it had. An orientation chosen with a `layout` command is always kept.
+/// Legacy accordion orientation choices, accepted without effect.
 public enum AccordionOrientation: String, CaseIterable {
     case auto, keep
 }
 
 public struct Accordion: Equatable {
-    /// Points by which neighbouring windows peek out.
+    /// Legacy accordion setting, accepted without effect.
     public var padding = 30
     public var orientation = AccordionOrientation.auto
 
@@ -248,7 +247,7 @@ public struct FocusFollowsMouse: Equatable {
     public var enabled = false
     /// How long the pointer must rest on a window before it takes focus.
     public var delayMs = 100
-    /// Whether resting on the peeking edge of an accordion child focuses it. Off, only the front child does.
+    /// Legacy accordion hover setting, accepted without effect.
     public var accordionEdges = true
 
     public init() {}
@@ -280,12 +279,14 @@ public struct Animations: Equatable {
 
 /// `[drag]`: dragging a tiled window with the mouse.
 public struct Drag: Equatable {
+    public var dropTargets = false
     /// Outline the tile a dragged window came from and the one it will swap with.
     public var placeholders = true
 
     public init() {}
 
     init(_ t: Table) throws {
+        dropTargets = try t.bool("drop-targets") ?? dropTargets
         placeholders = try t.bool("placeholders") ?? placeholders
         try t.done()
     }

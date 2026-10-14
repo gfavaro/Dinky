@@ -1,66 +1,161 @@
 import AppKit
 import DinkyLayout
 
-// Dragging a tiled window with the mouse. On release, a drag that moved one edge of the window on an axis is a
-// resize: the tree takes the new size and the other tiles make room. Any other drag is a move: dropping it with the
-// pointer over another tile swaps the two, anywhere else puts it back. While a move is under way, placeholders
-// outline the window's tile and the one it would swap with. Only frames that change while the mouse button is
-// down count as a drag, which keeps dinky's own frame writes and apps moving themselves out of it.
+struct DragSession {
+    let identity: Window.Identity
+    let space: UInt64
+    let layout: Layout
+    var fromTabStrip = false
+    var intent: DropIntent?
+    var targetIdentity: Window.Identity?
+}
+
 extension Coordinator {
+    func startDragEvents() {
+        dragEvents.onEvent = { [weak self] type, pointer, keyCode in
+            guard let self else { return }
+            self.dragPointer = pointer
+            if type == .keyDown, keyCode == 53 { self.tabBars.cancelGesture(); self.cancelDrag(); return }
+            if type == .leftMouseUp { self.finishDrag(); return }
+            if type == .leftMouseDragged { self.showPlaceholders() }
+        }
+        dragEvents.start()
+    }
+
+    func dragTab(_ id: WindowID, at point: CGPoint, title: String) {
+        guard enabled, !MissionControl.shared.active, dragEvents.available, !dragEvents.suppressed,
+              let key = placements[id]?.space, isVisible(key), let window = model.windows[id],
+              let workspace = workspaces[key], workspace.fullscreen == nil else { return }
+        if dragSession == nil {
+            dragging = id
+            dragSession = DragSession(identity: window.identity, space: key, layout: workspace.layout(), fromTabStrip: true)
+        }
+        guard dragSession?.identity == window.identity, dragSession?.fromTabStrip == true else { return }
+        dragPointer = point
+        showPlaceholders()
+        tabDragProxy.show(title: title, at: point, space: key, above: dropOverlay.windowID ?? id)
+    }
+
+    func finishTabDrag(at point: CGPoint) {
+        guard dragSession?.fromTabStrip == true else { return }
+        dragPointer = point
+        finishDrag()
+    }
+
     func noteFrameChange(of id: WindowID) {
         if dragging == id { return showPlaceholders() }
-        // Only tiled windows have a Space.
-        guard dragging == nil, placements[id]?.space != nil, !isAnimating(id), mouseButtonDown else { return }
+        guard enabled, !MissionControl.shared.active, dragging == nil, !tabBars.isInteracting, dragEvents.available,
+              !dragEvents.suppressed, mouseButtonDown, !isAnimating(id),
+              let key = placements[id]?.space, isVisible(key), let window = model.windows[id],
+              let layout = workspaces[key]?.layout(), let home = layout.frames[id],
+              !window.frame.isClose(to: home, within: 2) else { return }
         dragging = id
+        dragSession = DragSession(identity: window.identity, space: key, layout: layout)
+        dragPointer = CGEvent(source: nil)?.location
         showPlaceholders()
-        watchDragEnd()
     }
 
-    private func watchDragEnd() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            guard let self, let id = self.dragging else { return }
-            if self.mouseButtonDown {
-                self.showPlaceholders()
-                self.watchDragEnd()
-            } else {
-                self.dragging = nil
-                self.placeholders.hide()
-                self.dropped(id)
-            }
-        }
-    }
-
-    private func dropped(_ id: WindowID) {
-        guard let key = placements[id]?.space, let layout = workspaces[key]?.layout(), let window = model.windows[id],
-              let expected = layout.frames[id], !window.frame.isClose(to: expected, within: 2) else { return }
-        if let edges = movedEdges(from: expected, to: window.frame) {
-            edit(key) { $0.resize(id, to: window.frame.size, moving: edges) }
-        } else if let target = dropTarget(of: id, in: layout) {
-            edit(key) { $0.swap(id, target) }
-        }
-        dirty.insert(key)
+    func cancelDrag() {
+        guard let session = dragSession else { return }
+        dragging = nil
+        dragSession = nil
+        tabBars.cancelGesture()
+        tabDragProxy.hide()
+        placeholders.hide()
+        dropOverlay.hide()
+        dragEvents.suppressUntilRelease()
+        cancelledDragSpace = session.space
+        dirty.insert(session.space)
         flush()
     }
 
-    /// Outline the dragged window's tile and the tile it would swap with, while the drag is a move.
-    private func showPlaceholders() {
-        guard config.drag.placeholders, let id = dragging, let key = placements[id]?.space,
-              let layout = workspaces[key]?.layout(), let home = layout.frames[id], let window = model.windows[id],
-              !window.frame.isClose(to: home, within: 2), movedEdges(from: home, to: window.frame) == nil
-        else { return placeholders.hide() }
-        placeholders.show(dragged: id, home: home, target: dropTarget(of: id, in: layout).flatMap { layout.frames[$0] },
-                          cornerRadius: CGFloat(window.cornerRadius))
+    private func finishDrag() {
+        if let space = cancelledDragSpace {
+            cancelledDragSpace = nil
+            dirty.insert(space)
+            flush()
+        }
+        guard let session = dragSession else { return }
+        // Resolve the final pointer before clearing the drag. WindowServer events can lag mouse-up.
+        showPlaceholders(frame: liveFrame(session.identity.id))
+        guard let final = dragSession else { return }
+        dragging = nil
+        dragSession = nil
+        tabBars.cancelGesture()
+        tabDragProxy.hide()
+        placeholders.hide()
+        dropOverlay.hide()
+        guard enabled, model.windows[session.identity.id]?.identity == session.identity,
+              placements[session.identity.id]?.space == session.space, isVisible(session.space),
+              let window = model.windows[session.identity.id], let expected = session.layout.frames[window.id] else { return }
+        let frame = liveFrame(window.id) ?? window.frame
+        if session.fromTabStrip {
+            if commitDrop(final) { focus(window.id) }
+        } else if !frame.isClose(to: expected, within: 2) {
+            if let edges = movedEdges(from: expected, to: frame) {
+                edit(session.space) { $0.resize(window.id, to: frame.size, moving: edges) }
+            } else { _ = commitDrop(final) }
+        }
+        dirty.insert(session.space)
+        flush()
     }
 
-    /// The tile under the pointer that a dragged window swaps with, the frontmost where tiles overlap. The
-    /// placeholders and the drop both ask this, so what is outlined is what happens.
-    private func dropTarget(of id: WindowID, in layout: Layout) -> WindowID? {
-        guard let pointer = CGEvent(source: nil)?.location else { return nil }
-        return layout.order.first { $0 != id && layout.frames[$0]!.contains(pointer) }
+    private func commitDrop(_ session: DragSession) -> Bool {
+        guard let intent = session.intent, let identity = session.targetIdentity,
+              model.windows[intent.target]?.identity == identity, placements[intent.target]?.space == session.space else { return false }
+        if config.drag.dropTargets { return edit(session.space) { $0.drop(intent) } == true }
+        return edit(session.space) { $0.swap(intent.source, intent.target) } == true
     }
 
-    /// The edges a resize moved, going from the tile to the dropped frame: on each axis, one edge moved more than
-    /// 2 pt and the other stayed. Nil for a move, where some axis had both edges move, or nothing did.
+    private func showPlaceholders(frame: CGRect? = nil) {
+        guard var session = dragSession, let id = dragging, let window = model.windows[id],
+              window.identity == session.identity, placements[id]?.space == session.space, isVisible(session.space),
+              workspaces[session.space]?.fullscreen == nil else { return cancelDrag() }
+        session.intent = nil
+        session.targetIdentity = nil
+        let home = session.layout.frames[id]!
+        let currentFrame = frame ?? window.frame
+        guard session.fromTabStrip || (!currentFrame.isClose(to: home, within: 2) && movedEdges(from: home, to: currentFrame) == nil),
+              let pointer = dragPointer else {
+            dragSession = session
+            placeholders.hide()
+            dropOverlay.hide()
+            return
+        }
+        // Dragging the selected tab must expose its remaining group as a destination too.
+        let remainingTab = session.layout.tabGroups.first { $0.selected == id }?.tabs.first { $0 != id }
+        let target = session.layout.order.first { other in
+            guard other != id, session.layout.visibleWindows.contains(other) || remainingTab == other,
+                  placements[other]?.space == session.space, model.windows[other] != nil else { return false }
+            return destinationFrame(other, in: session.layout)?.contains(pointer) == true
+        }
+        let targetFrame = target.flatMap { destinationFrame($0, in: session.layout) }
+        if let target, let targetFrame {
+            session.intent = config.drag.dropTargets
+                ? DropZones.resolve(source: id, target: target, pointer: pointer, frame: targetFrame)
+                : DropIntent(source: id, target: target, zone: .swap)
+            session.targetIdentity = model.windows[target]?.identity
+        }
+        dragSession = session
+        if config.drag.placeholders {
+            placeholders.show(dragged: id, home: home, target: config.drag.dropTargets ? nil : targetFrame,
+                              cornerRadius: CGFloat(window.cornerRadius))
+        } else { placeholders.hide() }
+        if config.drag.dropTargets, let intent = session.intent, let targetFrame {
+            dropOverlay.show(frame: targetFrame, zone: intent.zone, above: intent.target, below: id)
+        } else { dropOverlay.hide() }
+    }
+
+    private func destinationFrame(_ id: WindowID, in layout: Layout) -> CGRect? {
+        layout.tabGroups.first { $0.windows.contains(id) }?.frame ?? layout.frames[id]
+    }
+
+    private func liveFrame(_ id: WindowID) -> CGRect? {
+        let info = CGWindowListCopyWindowInfo(.optionIncludingWindow, id) as? [[String: Any]]
+        guard let bounds = info?.first?[kCGWindowBounds as String] as? NSDictionary else { return nil }
+        return CGRect(dictionaryRepresentation: bounds as CFDictionary)
+    }
+
     private func movedEdges(from tile: CGRect, to frame: CGRect) -> Set<Direction>? {
         let axes = [((Direction.left, tile.minX, frame.minX), (Direction.right, tile.maxX, frame.maxX)),
                     ((Direction.up, tile.minY, frame.minY), (Direction.down, tile.maxY, frame.maxY))]
