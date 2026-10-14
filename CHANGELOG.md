@@ -18,6 +18,13 @@
 - Repeated title events share one pending Accessibility read and one follow-up read. Requests for groups that disappear are skipped before the read starts.
 - Release a tracked window from its layout if it becomes a panel or leaves the normal window layer. Hidden document windows retain their classification.
 
+### Restoration
+
+- Quit and disable restore original frames and surviving original Spaces without changing the active Space. Incomplete restorations remain journaled for explicit recovery. A deleted original Space keeps its window on the current Space.
+- Restart restores the last managed layout, including window order, split ratios, fullscreen state and floating frames. Inactive Spaces restore when visited. Current layout settings and rules take precedence.
+- Original positions are captured before the first arrangement. Starting disabled does not capture new origins or restore managed layouts until enabled.
+- Recovery preserves position changes made after an incomplete attempt, including across restarts. Each app reports frame results independently, so a slow app does not hide results from others.
+
 ## 0.18
 
 ### Key bindings

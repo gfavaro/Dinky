@@ -73,15 +73,32 @@ final class FrameApplier {
     /// Write every frame in `layout`, then raise overlapping windows into the layout's order if they are not,
     /// unless that would move focus away from a window other than `front`, the one the layout puts on top.
     /// `completion` runs on a background queue with the readback of every app touched.
-    func apply(_ layout: Layout, pids: [WindowID: pid_t], front: WindowID? = nil,
+    func apply(_ layout: Layout, pids: [WindowID: pid_t], front: WindowID? = nil, raiseWindows: Bool = true,
                completion: @escaping ([FrameResult]) -> Void = { _ in }) {
+        applyFrames(layout, pids: pids, front: front, raiseWindows: raiseWindows, progress: nil, completion: completion)
+    }
+
+    /// Per-app readbacks let recovery report responsive apps even if another app times out.
+    func apply(_ layout: Layout, pids: [WindowID: pid_t], front: WindowID? = nil, raiseWindows: Bool = true,
+               progress: @escaping ([FrameResult]) -> Void, completion: @escaping ([FrameResult]) -> Void) {
+        applyFrames(layout, pids: pids, front: front, raiseWindows: raiseWindows, progress: progress, completion: completion)
+    }
+
+    private func applyFrames(_ layout: Layout, pids: [WindowID: pid_t], front: WindowID?, raiseWindows: Bool,
+                             progress: (([FrameResult]) -> Void)?, completion: @escaping ([FrameResult]) -> Void) {
         let jobs = layout.order.compactMap { id in
             pids[id].map { FrameJob(pid: $0, id: id, frame: layout.frames[id]!) }
         }
-        scheduler.submit(jobs) { [unowned self] results in
+        let finished: ([FrameResult]) -> Void = { [unowned self] results in
             rememberAppMinimums(results)
-            raiseIntoOrder(layout, pids: pids, front: front) { completion(results) }
+            if raiseWindows {
+                raiseIntoOrder(layout, pids: pids, front: front) { completion(results) }
+            } else {
+                completion(results)
+            }
         }
+        if let progress { scheduler.submit(jobs, progress: progress, completion: finished) }
+        else { scheduler.submit(jobs, completion: finished) }
     }
 
     /// Raise overlapping windows into the layout's order if they are not, as `apply` does after writing.

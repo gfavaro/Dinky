@@ -9,6 +9,8 @@ import DinkyPrivate
 struct Placement {
     let floating: Bool
     var space: UInt64?
+    var floatingOverride: Bool? = nil
+    var lastKnownSpace: UInt64? = nil
 }
 
 // The serialized owner of layout state: one Workspace per Space, keyed by Space ID, fed by the window and
@@ -26,6 +28,7 @@ final class Coordinator {
     let displays: DisplayModel
     private(set) var config: Config
     let applier = FrameApplier()
+    let session = Session()
     private lazy var animator = Animator(applier: applier)
     private var borders: BorderManager?
     func isBorderWindow(_ id: WindowID) -> Bool { borders?.isBorder(id) ?? false }
@@ -75,7 +78,7 @@ final class Coordinator {
         self.config = config
     }
 
-    func start() {
+    func start(beforeTiling: () -> Void = {}) {
         model.observe { [weak self] event in self?.handle(event) }
         startDragEvents()
         tabBars.select = { [weak self] id in
@@ -122,12 +125,17 @@ final class Coordinator {
         for name in [NSWorkspace.didHideApplicationNotification, NSWorkspace.didUnhideApplicationNotification] {
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.reconcile() }
         }
-        guard model.start() else {
+        // Seed events must not classify or tile before original positions are captured.
+        session.start(coordinator: self)
+        let started = model.start()
+        beforeTiling()
+        guard started else {
             fputs("coordinator: no WindowServer events\n", stderr)
             return
         }
         update(config: config)
         reconcile()
+        session.saveSoon()
     }
 
     func update(config: Config) {
@@ -148,9 +156,20 @@ final class Coordinator {
         fitToDisplays()
         dirty.formUnion(workspaces.keys)
         flush()
+        session.saveSoon()
     }
 
     // MARK: Events
+
+    /// Release a temporary tile before a session move, then apply the destination without animation.
+    func prepareRestorationMove(_ window: Window, to space: UInt64) {
+        if let old = placements[window.id]?.space {
+            edit(old) { $0.remove(window.id) }
+            placements[window.id]?.space = nil
+        }
+        animator.forget(window.id)
+        snap.insert(space)
+    }
 
     private func handle(_ event: WindowEvent) {
         // Detected here, not in the border manager, so hover focus stands down even with borders off.
@@ -162,6 +181,8 @@ final class Coordinator {
         if let window = event.window {
             event.change == .removed ? forget(window.id) : track(window)
             if [.windowMove, .windowResize].contains(event.kind) { noteFrameChange(of: window.id) }
+            if [.windowMove, .windowResize].contains(event.kind),
+               placements[window.id]?.floating == true || !settings(for: window.spaceID).tiling { session.saveSoon() }
         }
         if [.frontApp, .windowReorder, .windowCreate].contains(event.kind) { syncFocus() }
         if [.frontApp, .windowReorder].contains(event.kind) {
@@ -188,6 +209,7 @@ final class Coordinator {
         syncFocus()
         dirty.formUnion(workspaces.keys)
         flush()
+        session.saveSoon()
     }
 
     /// Forgets every minimum size learned and re-applies every tree, so windows are asked for their tiles again.
@@ -276,14 +298,23 @@ final class Coordinator {
             forget(window.id)
             return
         }
+        guard enabled else { return }
+        AppState.shared.recovery.recordBeforeManaging(window)
+        guard !session.deferTiling(window) else { return }
         if placements[window.id] == nil {
             // AX only lists windows on a Space that is on screen; the rest are classified when theirs is.
             guard window.isNormal, isVisible(window.spaceID) else { return }
             // Once, on the first classification attempt, not again on its retries.
             if attempts[window.id] == nil { noteFirstShowing(window) }
             guard let classification = classify(window) else { return }
-            placements[window.id] = Placement(floating: classification.floating, space: nil)
+            placements[window.id] = Placement(floating: classification.floating, space: nil,
+                                               floatingOverride: session.floatingOverride(for: window))
+            session.saveSoon()
             if !classification.runsRules, adopt(window) { return }
+        }
+        if placements[window.id]?.lastKnownSpace != window.spaceID {
+            placements[window.id]?.lastKnownSpace = window.spaceID
+            session.saveSoon()
         }
         guard !adopting.contains(window.id), !placements[window.id]!.floating else { return }
         let old = placements[window.id]!.space
@@ -302,6 +333,7 @@ final class Coordinator {
 
     private func forget(_ id: WindowID) {
         if dragging == id || dragSession?.intent?.target == id { cancelDrag() }
+        session.saveSoon()
         attempts[id] = nil
         adoptTargets[id] = nil
         adopting.remove(id)
@@ -366,8 +398,10 @@ final class Coordinator {
     func edit<T>(_ key: UInt64, _ change: (inout Workspace) -> T) -> T? {
         guard var workspace = workspaces[key] else { return nil }
         let before = workspace.layout()
+        let saved = WorkspaceSnapshot(workspace)
         let result = change(&workspace)
         workspaces[key] = workspace
+        if WorkspaceSnapshot(workspace) != saved { session.saveSoon() }
         if workspace.layout() != before { dirty.insert(key); tabBarsDirty = true }
         return result
     }
@@ -375,10 +409,13 @@ final class Coordinator {
     // MARK: Applying
 
     func flush() {
+        guard !session.awaitingStartup else { return }
+        if enabled { restoreSession() }
         let keys = dirty
         dirty = []
         guard enabled else { return }
         for key in keys where isVisible(key) {
+            if session.isRestoring(on: key) { dirty.insert(key); continue }
             if dragSession?.space == key { dirty.insert(key); continue }
             apply(key)
         }
@@ -389,6 +426,35 @@ final class Coordinator {
             borders?.updateTabGroups(layouts.map(\.layout))
             tabBars.update(layouts, model: model)
         }
+    }
+
+    /// Restore trees before their first frame write. Inactive Spaces are restored on their first ordinary visit.
+    private func restoreSession() {
+        guard !session.pendingSpaces.isEmpty || !session.pendingWindows.isEmpty else { return }
+        session.prune(windows: model.windows, spaces: Set(displays.displays.flatMap(\.userSpaces)))
+        for key in Array(session.pendingSpaces.keys) {
+            guard settings(for: key).tiling else { session.discardLayout(on: key); continue }
+            guard isVisible(key), var workspace = workspaces[key] else { continue }
+            let held = Set(heldTabs.keys).union(adopting)
+            if session.restore(key, workspace: &workspace, windows: model.windows, placements: placements, held: held) == .restored {
+                workspaces[key] = workspace
+                snap.insert(key)
+                dirty.insert(key)
+                tabBarsDirty = true
+                session.saveSoon()
+            }
+        }
+        let jobs = session.floatingJobs(windows: model.windows, placements: placements,
+                                        displays: displays.displays.map(RecoveryDisplay.init), untiledSpaces: untiledSpaces)
+        guard !jobs.isEmpty else { return }
+        applier.apply(Layout(frames: Dictionary(uniqueKeysWithValues: jobs.map { ($0.id, $0.frame) }), order: jobs.map(\.id)),
+                      pids: Dictionary(uniqueKeysWithValues: jobs.map { ($0.id, $0.pid) }), raiseWindows: false) { [weak self] results in
+            DispatchQueue.main.async { self?.session.finished(jobs, results: results) }
+        }
+    }
+
+    var untiledSpaces: Set<UInt64> {
+        Set(displays.displays.flatMap(\.userSpaces).filter { !settings(for: $0).tiling })
     }
 
     /// Whether the Space is a display's current one.

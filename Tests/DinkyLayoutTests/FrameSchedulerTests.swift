@@ -255,6 +255,28 @@ struct FrameSchedulerTests {
         #expect(scheduler.minimumSizes == [:])
     }
 
+
+    @Test func `Progress reports responsive apps before a blocked app completes`() {
+        let fake = FakeWindows()
+        let held = DispatchSemaphore(value: 0)
+        fake.holds[10] = held
+        let scheduler = fake.scheduler()
+        let progress = DispatchSemaphore(value: 0), completed = DispatchSemaphore(value: 0)
+        let lock = NSLock()
+        var reported: [FrameResult] = []
+        scheduler.submit([job(1, 10, 0), job(2, 20, 0)], progress: { results in
+            lock.withLock { reported += results }
+            progress.signal()
+        }, completion: { _ in completed.signal() })
+        let responsive = progress.wait(timeout: .now() + 2)
+        #expect(responsive == .success)
+        #expect(lock.withLock { reported.map(\.job.id) } == [20])
+        #expect(completed.wait(timeout: .now()) == .timedOut)
+        held.signal()
+        #expect(completed.wait(timeout: .now() + 2) == .success)
+        #expect(lock.withLock { reported.map(\.job.id).sorted() } == [10, 20])
+    }
+
     @Test func `Empty submit completes immediately`() {
         let results = submitAndWait(FakeWindows().scheduler(), [])
         #expect(results.isEmpty)

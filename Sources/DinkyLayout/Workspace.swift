@@ -1,17 +1,44 @@
 import CoreGraphics
 
 /// How new windows are placed in a workspace. Dwindle carries the root's layout mode.
-public enum TilingAlgorithm: Equatable, Sendable {
+public enum TilingAlgorithm: Equatable, Sendable, Codable {
     case dwindle(LayoutMode)
     case fixed(rows: Int, columns: Int, expand: FixedExpansion)
     /// A strip of columns wider than the screen, scrolled to the focused one. See Scrolling.swift.
     case scrolling
 }
 
-public enum FixedExpansion: Equatable, Sendable {
+public enum FixedExpansion: Equatable, Sendable, Codable {
     case rows, columns, tabs
 
     public static let accordion = FixedExpansion.tabs
+
+    private enum CodingKeys: String, CodingKey { case rows, columns, tabs, accordion }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        guard container.allKeys.count == 1, let key = container.allKeys.first else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Invalid saved layout mode"))
+        }
+        switch key {
+        case .rows: self = .rows
+        case .columns: self = .columns
+        case .tabs: self = .tabs
+        case .accordion: self = .tabs
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        let key: CodingKeys
+        switch self {
+        case .rows: key = .rows
+        case .columns: key = .columns
+        case .tabs: key = .accordion
+        }
+        // Keep the legacy spelling so standalone restoration builds can read this journal.
+        _ = container.nestedContainer(keyedBy: CodingKeys.self, forKey: key)
+    }
 }
 
 /// One Space's tiling state: the tree, focus, fullscreen and the geometry settings used to lay it out.

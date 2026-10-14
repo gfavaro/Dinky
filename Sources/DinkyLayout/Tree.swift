@@ -13,18 +13,43 @@ public enum Orientation: Equatable, Sendable {
 
 /// How a container picks its axis: fixed, or `auto`, along the longer side of its rectangle (a square runs
 /// horizontally). `auto` is resolved wherever the rectangle is known, see `Container.axis(in:)`.
-public enum ContainerOrientation: Equatable, Sendable {
+public enum ContainerOrientation: Equatable, Sendable, Codable {
     case horizontal, vertical, auto
 
     public init(_ axis: Orientation) { self = axis == .horizontal ? .horizontal : .vertical }
 }
 
 /// How a container shows its children: side by side, or as a tabbed group.
-public enum LayoutMode: Equatable, Sendable {
+public enum LayoutMode: Equatable, Sendable, Codable {
     case tiles, tabs
 
     /// Source compatibility: accordion now displays tabs.
     public static let accordion = LayoutMode.tabs
+
+    private enum CodingKeys: String, CodingKey { case tiles, tabs, accordion }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        guard container.allKeys.count == 1, let key = container.allKeys.first else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Invalid saved layout mode"))
+        }
+        switch key {
+        case .tiles: self = .tiles
+        case .tabs: self = .tabs
+        case .accordion: self = .tabs
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        let key: CodingKeys
+        switch self {
+        case .tiles: key = .tiles
+        case .tabs: key = .accordion
+        }
+        // Keep the legacy spelling so standalone restoration builds can read this journal.
+        _ = container.nestedContainer(keyedBy: CodingKeys.self, forKey: key)
+    }
 }
 
 /// A direction for focus, swap, move and join-with.
@@ -47,7 +72,7 @@ public enum Direction: Equatable, Sendable {
 }
 
 /// A node in the tree: a window leaf or a container.
-public indirect enum Node: Equatable, Sendable {
+public indirect enum Node: Equatable, Sendable, Codable {
     case window(WindowID)
     case container(Container)
 
@@ -61,7 +86,7 @@ public indirect enum Node: Equatable, Sendable {
 }
 
 /// A container: ordered children with ratios that sum to 1.
-public struct Container: Equatable, Sendable {
+public struct Container: Equatable, Sendable, Codable {
     public var orientation: ContainerOrientation
     public var mode: LayoutMode
     /// Whether a `layout` command chose the orientation, so switching to tabs keeps it.
