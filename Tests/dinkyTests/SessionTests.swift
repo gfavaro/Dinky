@@ -520,4 +520,29 @@ struct SessionTests {
         #expect(!session.isRestoring(on: 815))
     }
 
+    @MainActor
+    @Test func `Disabled startup leaves the saved arrangement untouched`() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let session = Session(url: directory.appendingPathComponent("session.json"))
+        let saved = journal()
+        #expect(session.save(saved))
+        let coordinator = Coordinator(displays: DisplayModel(), config: .default)
+        coordinator.enabled = false
+        session.start(coordinator: coordinator)
+        session.saveSoon()
+        session.pause()
+        #expect(!session.awaitingStartup)
+        #expect(session.load() == saved)
+    }
+
+    @MainActor
+    @Test func `Startup holds seeded windows until the original-position capture completes`() {
+        let session = Session()
+        let coordinator = Coordinator(displays: DisplayModel(), config: .default)
+        session.start(coordinator: coordinator)
+        #expect(session.awaitingStartup)
+        #expect(session.deferTiling(window(1)))
+    }
+
 }

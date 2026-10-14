@@ -51,7 +51,7 @@ and exits 1 on errors or when it isn't running. CLI-only commands:
 |---|---|
 | `app` | Run the app in the foreground, logging to the terminal. |
 | `doctor [--config <path>]` | Check the config and macOS settings, and that no other tiling window manager is running. |
-| `recover` | Ask the running app to restore windows a crashed session left tiled. |
+| `recover` | Retry unfinished original frames and Spaces; leave dinky disabled. |
 | `debug events\|windows` | Print window events or windows, without the app. |
 | `version`, `-v`, `--version` | Print the version and build number. |
 
@@ -66,10 +66,17 @@ printf 'workspace 2\n' | nc -U "$TMPDIR/dinky.sock"
 
 ## Recovery
 
-dinky journals each window's original frame and Space before tiling it. `enable
-off`, quitting, `kill` and logging out put them all back. After a crash, the
-menu offers to restore them (or `dinky recover`); dinky stays off until `dinky
-enable on`.
+dinky journals each window's original frame and Space before managing it. Disable,
+quit and explicit `dinky recover` restore reachable frames and surviving original
+Spaces without changing the active Space or raising windows. A deleted original
+Space keeps its window on the current Space, with its frame fitted to the monitor.
+
+Unfinished entries stay on disk. `dinky recover` retries them and leaves dinky off;
+use `dinky enable on` to resume tiling. If a window's position changes after an
+incomplete attempt, recovery leaves it there. This comparison survives a restart
+and allows two points of frame variation. Starting disabled captures no new origins.
+Frame writes wait at most three seconds per batch and collect each app's results
+independently. There is no automatic retry loop.
 
 ## Session restoration
 
@@ -79,10 +86,12 @@ order, container layouts, split ratios and fullscreen state.
 Floating choices and frames are saved too. Current window rules and workspace
 layout settings take precedence.
 
-Windows stay on their current native macOS Spaces. A window moved to another
-Space while dinky is off keeps its new Space. Closed windows, windows from a new app
-process, and saved Spaces that no longer exist are skipped. dinky does not reopen
-apps or create Spaces to restore a session.
+Windows moved back by Dinky's quit or disable operation can return to their saved
+managed Spaces at startup. A move to another Space while Dinky is off takes
+precedence. If a saved Space was deleted, an existing configured workspace binding
+can supply its replacement. Otherwise the saved entry is skipped. Closed windows
+and windows from a new app process are skipped. Dinky does not reopen apps or
+create Spaces solely to restore a session.
 
 Trees restore before their first tiling pass. Inactive Spaces restore when you
 visit them; hidden and minimized floating windows restore when shown. Normal

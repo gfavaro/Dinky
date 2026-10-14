@@ -54,9 +54,9 @@ final class WindowModel {
     /// Subscribes to the shared WindowServer stream and seeds the table. False if WindowServer refused.
     /// Call once.
     func start() -> Bool {
-        guard EventHub.shared.subscribe({ [weak self] event in self?.handle(event) }) else { return false }
+        let subscribed = EventHub.shared.subscribe({ [weak self] event in self?.handle(event) })
         seed()
-        return true
+        return subscribed
     }
 
     /// Calls `handler` with every change once the model has taken it in, in the order observers were added.

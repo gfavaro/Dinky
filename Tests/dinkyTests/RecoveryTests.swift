@@ -273,4 +273,80 @@ struct RecoveryTests {
         #expect(f.recovery.recoverable == 0)
     }
 
+    @Test func `A pending retry preserves a changed frame or Space`() throws {
+        for movedSpace in [UInt64(815), 816] {
+            let f = Fixture(), window = window(1)
+            f.recovery.capture(window, display: display())
+            var current = state()
+            f.recovery.restore(windows: [1: window], displays: [display()], read: { _ in current }, write: { _ in [] })
+            #expect(try f.journal().windows[0].leftFrame == tiled)
+            current = state(space: movedSpace, frame: CGRect(x: 250, y: 200, width: 700, height: 500))
+            var writes = 0, moves = 0
+            f.recovery.restore(windows: [1: window], displays: [display()], read: { _ in current },
+                               write: { writes += $0.count; return [] }, move: { _, _ in moves += 1; return true })
+            #expect(writes == 0 && moves == 0)
+            #expect(f.recovery.recoverable == 0)
+        }
+    }
+
+    @Test func `Failed positions survive relaunch and respect later movement`() throws {
+        let f = Fixture(), window = window(1)
+        f.recovery.capture(window, display: display())
+        f.recovery.restore(windows: [1: window], displays: [display()], read: { _ in state() }, write: { _ in [] })
+        let saved = try f.journal()
+        let previous = Recovery.Journal(pid: -1, launched: saved.launched, windows: saved.windows)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        try encoder.encode(previous).write(to: f.url)
+        let restarted = Recovery(url: f.url)
+        restarted.carryOver(windows: [1: window], launchDate: { _ in .distantPast })
+        #expect(restarted.recoverable == 1)
+        var writes = 0
+        restarted.restore(windows: [1: window], displays: [display()],
+                          read: { _ in state(frame: CGRect(x: 250, y: 200, width: 700, height: 500)) },
+                          write: { writes += $0.count; return [] })
+        #expect(writes == 0 && restarted.recoverable == 0)
+    }
+
+    @Test func `Enabling after a failed restore captures the changed position as the new origin`() throws {
+        let f = Fixture(), originalWindow = window(1)
+        f.recovery.capture(originalWindow, display: display())
+        f.recovery.restore(windows: [1: originalWindow], displays: [display()], read: { _ in state() }, write: { _ in [] })
+        var moved = originalWindow
+        moved.frame = CGRect(x: 250, y: 200, width: 700, height: 500)
+        f.recovery.resume(windows: [1: moved], read: { _ in state(frame: moved.frame) })
+        f.recovery.capture(moved, display: display())
+        f.recovery.restore(windows: [1: moved], displays: [display()], read: { _ in state(shown: false) }, write: { _ in [] })
+        #expect(try f.journal().windows[0].frame == moved.frame)
+    }
+
+    @Test func `Small frame changes do not abandon a failed restore`() {
+        let f = Fixture(), window = window(1)
+        f.recovery.capture(window, display: display())
+        var current = state()
+        f.recovery.restore(windows: [1: window], displays: [display()], read: { _ in current }, write: { _ in [] })
+        current = state(frame: tiled.offsetBy(dx: 1, dy: 1))
+        var writes = 0
+        f.recovery.restore(windows: [1: window], displays: [display()], read: { _ in current }, write: { writes += $0.count; return [] })
+        #expect(writes == 1 && f.recovery.recoverable == 1)
+    }
+
+    @Test func `A late successful response is confirmed before comparing failed positions`() {
+        let f = Fixture(), window = window(1)
+        f.recovery.capture(window, display: display())
+        var current = state()
+        f.recovery.restore(windows: [1: window], displays: [display()], read: { _ in current }, write: { _ in [] })
+        current = state(frame: original)
+        let summary = f.recovery.restore(windows: [1: window], displays: [display()], read: { _ in current },
+                                         write: { _ in Issue.record("Already restored"); return [] })
+        #expect(summary.contains("restored 1 of 1"))
+        #expect(f.recovery.recoverable == 0)
+    }
+
+    @Test func `Capture stays off until explicitly resumed`() {
+        let recovery = Recovery(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        recovery.capture(window(1), display: display())
+        #expect(recovery.recoverable == 0)
+    }
+
 }

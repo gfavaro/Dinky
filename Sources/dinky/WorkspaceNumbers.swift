@@ -80,7 +80,7 @@ final class WorkspaceNumbers {
     /// Runs the plan's steps until the Spaces match the config. Blocks the main thread while it works; each step
     /// waits for WindowServer to show its result, normally within a poll or two.
     func arrange() {
-        guard !arranging else { return }
+        guard AppState.shared.enabled, !arranging else { return }
         // A swipe in flight would land on a Space this may remove.
         guard !SpaceSwitcher.shared.switching else { return arrangeSoon(after: 0.3) }
         arranging = true

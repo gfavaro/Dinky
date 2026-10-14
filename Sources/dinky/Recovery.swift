@@ -11,6 +11,9 @@ final class Recovery {
         var firstSeen: Date
         let frame: CGRect
         let spaceID: UInt64
+        // The last observed position after an incomplete attempt, persisted across restarts.
+        var leftFrame: CGRect? = nil
+        var leftSpaceID: UInt64? = nil
         var displayUUID: String? = nil
         var displayVisibleFrame: CGRect? = nil
 
@@ -50,13 +53,34 @@ final class Recovery {
         model.observe { [weak self] _ in self?.record() }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
                                                           object: nil, queue: .main) { [weak self] _ in self?.record() }
-        resume()
     }
 
     /// Journals windows from now on. Call before tiling (re)starts.
     func resume() {
-        recording = true
+        if let model { resume(windows: model.windows, read: readWindow) }
+        else { recording = true }
         record()
+    }
+
+    /// A changed position becomes the next origin when management resumes.
+    func resume(windows: [UInt32: Window], read: (UInt32) -> RecoveryWindowState?) {
+        for (id, entry) in entries {
+            guard windows[id]?.identity == entry.identity, let state = read(id), state.pid == entry.pid else { continue }
+            if changedSinceFailure(entry, state: state) {
+                entries[id] = nil
+                carried.remove(id)
+            } else {
+                entries[id]?.leftFrame = nil
+                entries[id]?.leftSpaceID = nil
+            }
+        }
+        recording = true
+        save()
+    }
+
+    private func changedSinceFailure(_ entry: Entry, state: RecoveryWindowState) -> Bool {
+        guard let frame = entry.leftFrame, let space = entry.leftSpaceID else { return false }
+        return state.space != space || !state.frame.isClose(to: frame, within: 2)
     }
 
     /// Restores untiled frames and returns windows to surviving original Spaces without switching focus.
@@ -87,11 +111,24 @@ final class Recovery {
         let total = entries.count
         var restored = 0
         var closed = 0
+        var preserved = 0
         for entry in entries.values.sorted(by: { $0.id < $1.id }) {
             guard windows[entry.id]?.identity == entry.identity,
                   let state = read(entry.id), state.pid == entry.pid else {
                 entries.removeValue(forKey: entry.id)
                 closed += 1
+                continue
+            }
+            // A late successful write wins over a changed-position check.
+            if state.space == entry.spaceID, state.frame.isClose(to: entry.frame, within: 2) {
+                entries[entry.id] = nil
+                restored += 1
+                continue
+            }
+            if changedSinceFailure(entry, state: state) {
+                entries[entry.id] = nil
+                preserved += 1
+                fputs("recovery: window \(entry.id): position changed since the last attempt; leaving it there\n", stderr)
                 continue
             }
             guard let display = displays.first(where: { $0.userSpaces.contains(state.space) }) else {
@@ -143,6 +180,11 @@ final class Recovery {
             entries[entry.id] = nil
             restored += 1
         }
+        for id in entries.keys {
+            guard let state = read(id), state.pid == entries[id]?.pid else { continue }
+            entries[id]?.leftFrame = state.frame
+            entries[id]?.leftSpaceID = state.space
+        }
         carried = Set(entries.keys)
         save()
         for (id, problem) in problems.sorted(by: { $0.key < $1.key }) {
@@ -150,6 +192,7 @@ final class Recovery {
         }
         let summary = "restored \(restored) of \(total) windows; \(entries.count) pending"
             + (closed == 0 ? "" : "; \(closed) closed")
+            + (preserved == 0 ? "" : "; \(preserved) kept at changed positions")
         print("recovery: \(summary)")
         fflush(stdout)
         return summary
@@ -169,11 +212,18 @@ final class Recovery {
     /// Keeps a previous session's entries whose window still exists, owned by the same app, and first seen
     /// after that app launched. Anything else is a reused window ID and is never touched.
     private func carryOver() {
-        guard let model, let data = try? Data(contentsOf: journalURL),
+        guard let model else { return }
+        carryOver(windows: model.windows, launchDate: {
+            NSRunningApplication(processIdentifier: $0)?.launchDate
+        })
+    }
+
+    func carryOver(windows: [UInt32: Window], launchDate: (pid_t) -> Date?) {
+        guard let data = try? Data(contentsOf: journalURL),
               let journal = try? decoder.decode(Journal.self, from: data), journal.pid != getpid() else { return }
         for var entry in journal.windows {
-            guard let window = model.windows[entry.id] else { continue }
-            let launched = NSRunningApplication(processIdentifier: entry.pid)?.launchDate ?? .distantPast
+            guard let window = windows[entry.id] else { continue }
+            let launched = launchDate(entry.pid) ?? .distantPast
             guard window.pid == entry.pid, window.bundleID == entry.bundleID, launched <= entry.firstSeen else {
                 fputs("recovery: window \(entry.id) is now another window, not restoring it\n", stderr)
                 continue
@@ -272,9 +322,8 @@ final class Recovery {
         let layout = Layout(frames: Dictionary(uniqueKeysWithValues: jobs.map { ($0.id, $0.frame) }),
                             order: jobs.map(\.id).sorted { (stacking[$0] ?? .max) < (stacking[$1] ?? .max) })
         let completion = RecoveryFrameCompletion()
-        applier.apply(layout, pids: Dictionary(uniqueKeysWithValues: jobs.map { ($0.id, $0.pid) }), raiseWindows: false) {
-            completion.complete($0)
-        }
+        applier.apply(layout, pids: Dictionary(uniqueKeysWithValues: jobs.map { ($0.id, $0.pid) }), raiseWindows: false,
+                      progress: completion.add, completion: { _ in completion.complete([]) })
         return completion.wait(until: .now() + 3)
     }
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Restoration
+
+- Quit and disable restore original frames and surviving original Spaces without changing the active Space. Incomplete restorations remain journaled for explicit recovery. A deleted original Space keeps its window on the current Space.
+- Restart restores the last managed layout, including window order, split ratios, fullscreen state and floating frames. Inactive Spaces restore when visited. Current layout settings and rules take precedence.
+- Original positions are captured before the first arrangement. Starting disabled does not capture new origins or restore managed layouts until enabled.
+- Recovery preserves position changes made after an incomplete attempt, including across restarts. Each app reports frame results independently, so a slow app does not hide results from others.
+
 ## 0.18
 
 ### Key bindings
@@ -14,7 +23,6 @@
 
 ### Tiling
 
-- Restarting restores saved layout order, split ratios, fullscreen state and floating frames for surviving windows on their current native Spaces. Inactive Spaces restore on their next visit. Current rules and layout settings take precedence.
 
 ### Fixes
 

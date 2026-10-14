@@ -73,9 +73,18 @@ public final class FrameScheduler: @unchecked Sendable {
     /// Queue frames. `completion` gets the results of every process queue these jobs went to,
     /// once each has written them (or newer frames for the same windows).
     public func submit(_ jobs: [FrameJob], completion: Completion? = nil) {
+        enqueue(jobs, progress: nil, completion: completion)
+    }
+
+    /// Reports each process independently, before the whole batch completes.
+    public func submit(_ jobs: [FrameJob], progress: @escaping Completion, completion: @escaping Completion) {
+        enqueue(jobs, progress: progress, completion: completion)
+    }
+
+    private func enqueue(_ jobs: [FrameJob], progress: Completion?, completion: Completion?) {
         let byPid = Dictionary(grouping: jobs, by: \.pid)
         guard !byPid.isEmpty else { completion?([]); return }
-        let batch = Batch(waiting: byPid.count, completion)
+        let batch = Batch(waiting: byPid.count, progress: progress, completion: completion)
         lock.withLock {
             for (pid, jobs) in byPid {
                 let app = app(pid)
@@ -253,13 +262,16 @@ public final class FrameScheduler: @unchecked Sendable {
         private var waiting: Int
         private var results: [FrameResult] = []
         private let completion: Completion?
+        private let progress: Completion?
 
-        init(waiting: Int, _ completion: Completion?) {
+        init(waiting: Int, progress: Completion?, completion: Completion?) {
+            self.progress = progress
             self.waiting = waiting
             self.completion = completion
         }
 
         func report(_ new: [FrameResult]) {
+            progress?(new)
             let done: [FrameResult]? = lock.withLock {
                 results += new
                 waiting -= 1

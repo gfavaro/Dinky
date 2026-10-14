@@ -56,11 +56,18 @@ struct RecoveryWindowState {
 final class RecoveryFrameCompletion {
     private let lock = NSLock()
     private let done = DispatchSemaphore(value: 0)
-    private var results: [FrameResult] = []
+    private var results: [WindowID: FrameResult] = [:]
     private var closed = false
 
+    func add(_ results: [FrameResult]) {
+        lock.withLock {
+            guard !closed else { return }
+            for result in results { self.results[result.job.id] = result }
+        }
+    }
+
     func complete(_ results: [FrameResult]) {
-        lock.withLock { if !closed { self.results = results } }
+        add(results)
         done.signal()
     }
 
@@ -68,7 +75,7 @@ final class RecoveryFrameCompletion {
         _ = done.wait(timeout: deadline)
         return lock.withLock {
             closed = true
-            return results
+            return results.values.sorted { $0.job.id < $1.job.id }
         }
     }
 }

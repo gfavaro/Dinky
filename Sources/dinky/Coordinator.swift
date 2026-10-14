@@ -82,12 +82,14 @@ final class Coordinator {
         for name in [NSWorkspace.didHideApplicationNotification, NSWorkspace.didUnhideApplicationNotification] {
             center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.reconcile() }
         }
-        guard model.start() else {
+        // Seed events must not classify or tile before original positions are captured.
+        session.start(coordinator: self)
+        let started = model.start()
+        beforeTiling()
+        guard started else {
             fputs("coordinator: no WindowServer events\n", stderr)
             return
         }
-        beforeTiling()
-        session.start(coordinator: self)
         update(config: config)
         reconcile()
         session.saveSoon()
@@ -241,6 +243,7 @@ final class Coordinator {
     /// Classifies a window the first time it is on screen, then keeps it in the tree of its current Space
     /// while it is shown: minimized windows, windows of hidden apps and inactive tabs read as minimized.
     func track(_ window: Window) {
+        guard enabled else { return }
         AppState.shared.recovery.recordBeforeManaging(window)
         guard !session.deferTiling(window) else { return }
         if placements[window.id] == nil {

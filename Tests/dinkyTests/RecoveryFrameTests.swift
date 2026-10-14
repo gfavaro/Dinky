@@ -59,4 +59,16 @@ struct RecoveryFrameTests {
         completion.complete([FrameResult(job: job, target: job.frame, got: job.frame)])
         #expect(completion.wait(until: .now()).isEmpty)
     }
+    @Test func `Partial app results survive the batch timeout and late results are ignored`() {
+        let completion = RecoveryFrameCompletion()
+        let one = FrameJob(pid: 10, id: 1, frame: CGRect(x: 100, y: 100, width: 600, height: 400))
+        let two = FrameJob(pid: 20, id: 2, frame: one.frame)
+        let result = FrameResult(job: one, target: one.frame, got: one.frame)
+        completion.add([result])
+        #expect(completion.wait(until: .now()) == [result])
+        completion.add([FrameResult(job: two, target: two.frame, got: two.frame)])
+        completion.complete([])
+        #expect(completion.wait(until: .now()) == [result])
+    }
+
 }

@@ -59,11 +59,17 @@ final class AppState {
         guard coordinator == nil else { return }
         let coordinator = Coordinator(displays: displays, config: config)
         self.coordinator = coordinator
-        coordinator.start { recovery.start(model: coordinator.model, applier: coordinator.applier) }
+        coordinator.enabled = enabled
+        coordinator.start {
+            recovery.start(model: coordinator.model, applier: coordinator.applier)
+            if enabled { recovery.resume() }
+        }
         // Once the windows are known, so each workspace's windows move with it, and before the hooks, which
         // report workspace numbers.
-        numbers.arrange()
-        coordinator.session.finishStartup(coordinator: coordinator)
+        if enabled {
+            numbers.arrange()
+            coordinator.session.finishStartup(coordinator: coordinator)
+        }
         hooks.start()
         hoverFocus.update(config: config.focusFollowsMouse)
     }
@@ -73,14 +79,18 @@ final class AppState {
     /// menu's Enabled item, `dinky recover` and quitting all come through here.
     @discardableResult
     func setEnabled(_ on: Bool) -> String {
-        if on { coordinator?.session.resume() } else {
+        if on, !enabled {
+            recovery.resume()
+            enabled = true
+            numbers.arrange()
+            coordinator?.session.resume()
+        } else if !on {
             displays.reconcile()
             let destinations = recovery.returnSpaces(windows: coordinator?.model.windows ?? [:],
                                                       displays: displays.displays.map(RecoveryDisplay.init))
             coordinator?.session.pause(returnSpaces: destinations)
+            enabled = false
         }
-        if on { recovery.resume() }
-        enabled = on
         propagateEnabled()
         return on ? "" : recovery.restore()
     }
@@ -105,7 +115,7 @@ final class AppState {
             // At launch the app arranges the workspaces itself, once the coordinator has started.
             if let coordinator {
                 coordinator.update(config: config)
-                numbers.arrange()
+                if enabled { numbers.arrange() }
                 hoverFocus.update(config: config.focusFollowsMouse)
             }
             applyStartAtLogin(config.startAtLogin)

@@ -62,7 +62,7 @@ final class Session {
     init(url: URL = Session.url) { self.url = url }
 
     func start(coordinator: Coordinator) {
-        awaitingStartup = true
+        awaitingStartup = coordinator.enabled
         startSaving { [weak self, weak coordinator] in
             guard let self, let coordinator else { return nil }
             return snapshot(workspaces: coordinator.workspaces, windows: coordinator.model.windows,
@@ -71,6 +71,7 @@ final class Session {
                             untiledSpaces: coordinator.untiledSpaces, binding: AppState.shared.numbers.binding,
                             launchDate: Self.launchDate)
         }
+        recording = coordinator.enabled
     }
 
     /// Number bindings exist only after the initial Space arrangement completes.
