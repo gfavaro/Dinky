@@ -28,6 +28,8 @@ struct Display: Equatable {
     let id: CGDirectDisplayID
     /// Global CG coordinates, top-left origin.
     let frame: CGRect
+    /// Usable bounds captured with the display, so Dock/menu-bar changes participate in equality.
+    let visibleArea: CGRect
     let isMain: Bool
     /// Every Space in Mission Control order, full-screen ones included. Swipes step over all of them.
     let spaces: [UInt64]
@@ -41,6 +43,9 @@ struct Display: Equatable {
 // Refreshed from WindowServer Space events, screen reconfiguration, a poll and `reconcile()`. Main thread only.
 final class DisplayModel {
     private(set) var displays: [Display] = []
+    private let read: (() -> [Display])?
+
+    init(read: (() -> [Display])? = nil) { self.read = read }
     /// The Space each display was on before its current one, by display UUID, for back-and-forth.
     private var previousSpaceIDs: [String: UInt64] = [:]
     /// The Space each display last settled on: a swipe passes through the Spaces between, which don't count.
@@ -73,7 +78,7 @@ final class DisplayModel {
 
     /// Re-reads every display from WindowServer. Records previous Spaces and publishes if anything changed.
     func reconcile() {
-        let fresh = readDisplays()
+        let fresh = read?() ?? readDisplays()
         // Also when nothing else changed: a swipe that gave up settles where it already was.
         for display in fresh {
             if let target = SpaceSwitcher.shared.target(on: display.uuid), target != display.currentSpaceID { continue }
@@ -126,10 +131,16 @@ final class DisplayModel {
     }
 
     private func readDisplays() -> [Display] {
-        dinky_displays().compactMap { d in
+        let primaryHeight = NSScreen.screens.first?.frame.maxY
+        return dinky_displays().compactMap { d in
             // Skip a display that went away between the Space query and now; its bounds would be stale.
             guard d.displayID != 0, CGDisplayIsOnline(d.displayID) != 0 else { return nil }
-            return Display(uuid: d.uuid, id: d.displayID, frame: CGDisplayBounds(d.displayID),
+            let frame = CGDisplayBounds(d.displayID)
+            let area: CGRect
+            if let primaryHeight, let screen = screen(of: d.displayID) {
+                area = usableDisplayFrame(screen.visibleFrame, primaryHeight: primaryHeight)
+            } else { area = frame }
+            return Display(uuid: d.uuid, id: d.displayID, frame: frame, visibleArea: area,
                            isMain: CGDisplayIsMain(d.displayID) != 0,
                            spaces: d.spaces.map(\.spaceID),
                            userSpaces: d.spaces.filter(\.isUser).map(\.spaceID),

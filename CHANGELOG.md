@@ -8,6 +8,8 @@
 
 ### Layout and dragging
 
+- Refit tiles when the Dock or menu bar changes the usable screen area, even when display geometry and native Spaces stay the same.
+
 - Restore accordion stacking with peeking edges, configurable padding and automatic orientation. Remove tab strips, close controls and the tab-title cache.
 - Existing `tabs` commands, configuration spellings and saved layouts load as accordion. The menu and window-layout reports use accordion names.
 - Drag targets offer Accordion, Left, Right, Above, Below and Swap. Fixed cells, manual scrolling widths and saved layout ratios remain available.

@@ -13,13 +13,6 @@ func screen(of id: CGDirectDisplayID) -> NSScreen? {
 extension Display {
     /// The name System Settings shows, such as "Built-in Retina Display".
     var name: String { screen(of: id)?.localizedName ?? "" }
-
-    /// The frame minus menu bar and Dock, in CG coordinates (top-left origin at the primary display).
-    var visibleArea: CGRect {
-        guard let primary = NSScreen.screens.first, let screen = screen(of: id) else { return frame }
-        let visible = screen.visibleFrame
-        return CGRect(x: visible.minX, y: primary.frame.maxY - visible.maxY, width: visible.width, height: visible.height)
-    }
 }
 
 extension DisplayModel {
@@ -35,4 +28,10 @@ extension DinkyLayout.Gaps {
                   top: CGFloat(gaps.outer.top), bottom: CGFloat(gaps.outer.bottom),
                   left: CGFloat(gaps.outer.left), right: CGFloat(gaps.outer.right))
     }
+}
+
+/// AppKit uses bottom-left coordinates; layout frames use a top-left origin at the primary screen.
+func usableDisplayFrame(_ visibleFrame: CGRect, primaryHeight: CGFloat) -> CGRect {
+    CGRect(x: visibleFrame.minX, y: primaryHeight - visibleFrame.maxY,
+           width: visibleFrame.width, height: visibleFrame.height)
 }
