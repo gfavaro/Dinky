@@ -58,9 +58,7 @@ final class BorderWindow {
         }
     }
 
-    /// Reuse a group's border when its selected member changes.
-    func retarget(_ target: UInt32) { self.target = target }
-
+    /// Release the hidden window's backing surface.
     func hide() {
         guard id != 0 else { return }
         // An ordered-out border still owns a full-window backing surface.

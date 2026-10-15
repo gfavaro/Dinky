@@ -118,34 +118,33 @@ struct WorkspaceSnapshotTests {
             #expect(restored == original)
         }
     }
-    @Test func `Tabbed snapshots preserve selection order and manual proportions`() throws {
-        var original = Workspace(bounds: CGRect(x: 0, y: 0, width: 1600, height: 900), algorithm: .dwindle(.tabs))
+    @Test func `Former tab snapshots restore as accordion with peeking edges`() throws {
+        var original = Workspace(bounds: CGRect(x: 0, y: 0, width: 1600, height: 900),
+                                 algorithm: .dwindle(.accordion))
         for id in UInt32(1)...3 { original.insert(id) }
-        let reordered = original.reorderTab(1, to: 2, members: [1, 2, 3])
-        #expect(reordered)
         original.focus(2)
-        let data = try JSONEncoder().encode(WorkspaceSnapshot(original))
-        let saved = try JSONDecoder().decode(WorkspaceSnapshot.self, from: data)
+        let encoded = String(decoding: try JSONEncoder().encode(WorkspaceSnapshot(original)), as: UTF8.self)
+        let formerTabs = encoded.replacingOccurrences(of: "accordion", with: "tabs")
+        let saved = try JSONDecoder().decode(WorkspaceSnapshot.self, from: Data(formerTabs.utf8))
         var restored = Workspace(bounds: original.bounds, algorithm: original.algorithm)
-        let didRestore = restored.restore(saved, retaining: [1, 2, 3])
-        #expect(didRestore)
+        let accepted = restored.restore(saved, retaining: [1, 2, 3])
+        #expect(accepted)
         #expect(restored.root == original.root)
-        #expect(restored.layout().tabGroups == original.layout().tabGroups)
         #expect(restored.focused == 2)
-        #expect(String(decoding: data, as: UTF8.self).contains("accordion"))
+        #expect(restored.layout().frames[1] != restored.layout().frames[2])
+        #expect(restored.layout() == original.layout())
     }
 
-    @Test func `Both tabs and legacy accordion spellings decode in saved layouts`() throws {
+    @Test func `Former fixed tab overflow restores as accordion`() throws {
         var original = Workspace(bounds: CGRect(x: 0, y: 0, width: 1600, height: 900),
-                                 algorithm: .fixed(rows: 1, columns: 1, expand: .tabs))
+                                 algorithm: .fixed(rows: 1, columns: 1, expand: .accordion))
         original.insert(1)
         original.insert(2)
         let encoded = String(decoding: try JSONEncoder().encode(WorkspaceSnapshot(original)), as: UTF8.self)
-        for text in [encoded, encoded.replacingOccurrences(of: "accordion", with: "tabs")] {
-            let saved = try JSONDecoder().decode(WorkspaceSnapshot.self, from: Data(text.utf8))
-            #expect(saved.algorithm == original.algorithm)
-            #expect(saved.root == original.root)
-        }
+        let formerTabs = encoded.replacingOccurrences(of: "accordion", with: "tabs")
+        let saved = try JSONDecoder().decode(WorkspaceSnapshot.self, from: Data(formerTabs.utf8))
+        #expect(saved.algorithm == original.algorithm)
+        #expect(saved.root == original.root)
     }
 
 }

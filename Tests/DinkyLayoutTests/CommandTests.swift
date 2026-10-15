@@ -40,8 +40,8 @@ struct NeighborTests {
         #expect(ws.focus(.left) == false)
     }
 
-    @Test func `Tab neighbours follow child order`() {
-        var ws = workspace(3, algorithm: .dwindle(.tabs))
+    @Test func `Accordion neighbours follow child order`() {
+        var ws = workspace(3, algorithm: .dwindle(.accordion))
         #expect(ws.neighbor(of: 3, .left) == 2)
         ws.focus(1)
         #expect(ws.neighbor(of: 1, .right) == 2)
@@ -82,18 +82,18 @@ struct SwapAndMoveTests {
         #expect(shape(ws.root) == "h[1 v[2 3]]")
     }
 
-    @Test func `Move past a root tab group edge leaves it for a tile`() {
-        var ws = workspace(3, algorithm: .dwindle(.tabs))
+    @Test func `Move past a root accordion edge leaves it for a tile`() {
+        var ws = workspace(3, algorithm: .dwindle(.accordion))
         #expect(ws.move(.right) == true)
-        #expect(shape(ws.root) == "h[th[1 2] 3]")
-        #expect(ws.move(.left) == true, "moving back enters the tab group at its near edge")
-        #expect(shape(ws.root) == "th[1 2 3]")
+        #expect(shape(ws.root) == "h[ah[1 2] 3]")
+        #expect(ws.move(.left) == true, "moving back enters the accordion at its near edge")
+        #expect(shape(ws.root) == "ah[1 2 3]")
     }
 
-    @Test func `Move at the edge of a lone tabbed window does nothing`() {
-        var ws = workspace(1, algorithm: .dwindle(.tabs))
+    @Test func `Move at the edge of a lone accordion window does nothing`() {
+        var ws = workspace(1, algorithm: .dwindle(.accordion))
         #expect(ws.move(.right) == false)
-        #expect(shape(ws.root) == "th[1]")
+        #expect(shape(ws.root) == "ah[1]")
     }
 
     @Test func `Move across root wraps it`() {

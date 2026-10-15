@@ -288,16 +288,16 @@ struct FrameSchedulerTests {
         #expect(workspace(3).layout().raises(current: [2, 3, 1]) == [])
     }
 
-    @Test func `Tabs raise only when order differs`() {
-        let layout = workspace(3, algorithm: .dwindle(.tabs)).layout()
+    @Test func `Accordion raises only when order differs`() {
+        let layout = workspace(3, algorithm: .dwindle(.accordion)).layout()
         #expect(layout.order == [3, 2, 1])
         #expect(layout.raises(current: [3, 99, 2, 1]) == [])
-        #expect(layout.raises(current: [1, 2, 3]) == [3], "inactive tabs are fully covered, so only the selected tab goes up")
-        #expect(layout.raises(current: [3, 1, 2]) == [], "the front window is on top; the order of fully covered members does not matter")
+        #expect(layout.raises(current: [1, 2, 3]) == [2, 3], "1 is already below 2, so only 2 and 3 go up")
+        #expect(layout.raises(current: [3, 1, 2]) == [], "the front window is on top; which one peeks is not worth a flash")
     }
 
-    @Test func `Tab neighbours only need the front window on top`() {
-        var ws = workspace(3, algorithm: .dwindle(.tabs))
+    @Test func `Accordion neighbours only need the front window on top`() {
+        var ws = workspace(3, algorithm: .dwindle(.accordion))
         ws.focus(2)
         let layout = ws.layout()
         #expect(layout.order == [2, 1, 3])

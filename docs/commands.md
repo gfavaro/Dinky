@@ -23,7 +23,7 @@ prints it.
 | `move <left\|down\|up\|right>` | Move the focused window in the tree. |
 | `join-with <left\|down\|up\|right>` | Put the focused window and its neighbour in a new container. |
 | `resize <smart\|width\|height> <+n\|-n>` | Resize by n points. |
-| `layout <tiles\|tabs\|accordion\|horizontal\|vertical\|auto\|h_tiles\|v_tiles\|h_tabs\|v_tabs\|h_accordion\|v_accordion\|floating\|tiling\|scrolling>...` | Set the container's layout, float/tile the window, or switch the workspace to [scrolling](configuration.md#scrolling); a container layout switches it back. Given several, applies the one after the current one, so `layout floating tiling` toggles and `layout tiles tabs scrolling` cycles. Acts on the focused window, tiling it first if it floats, so it does nothing on an empty workspace. |
+| `layout <tiles\|tabs\|accordion\|horizontal\|vertical\|auto\|h_tiles\|v_tiles\|h_tabs\|v_tabs\|h_accordion\|v_accordion\|floating\|tiling\|scrolling>...` | Set the container's layout, float/tile the window, or switch the workspace to [scrolling](configuration.md#scrolling); a container layout switches it back. Given several, applies the one after the current one, so `layout floating tiling` toggles and `layout tiles accordion scrolling` cycles. Acts on the focused window, tiling it first if it floats, so it does nothing on an empty workspace. |
 | `fullscreen` | Toggle filling the workspace (not macOS full screen). |
 | `flatten-workspace-tree` | Put every window back into the workspace's layout, in order, undoing tree edits. A scrolling workspace keeps its column widths. |
 | `balance-sizes` | Give every window an equal share. |
@@ -155,4 +155,4 @@ state on `workspace-changed`, which always follows. `mode-changed` sets
 `DINKY_MODE` and `DINKY_PREV_MODE`; `dinky list-modes --current` prints the
 mode at any time. `exec-and-forget` has Homebrew on `PATH`.
 
-`layout accordion`, `h_accordion`, and `v_accordion` remain aliases for tabbed layouts. Use `tabs`, `h_tabs`, and `v_tabs` in new bindings.
+`layout accordion`, `h_accordion`, and `v_accordion` select accordion stacking. The former `tabs`, `h_tabs`, and `v_tabs` spellings remain compatibility aliases for accordion; they do not create tab strips.

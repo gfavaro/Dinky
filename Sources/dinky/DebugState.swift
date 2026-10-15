@@ -30,7 +30,7 @@ extension Coordinator {
                 let layout = workspace.layout()
                 return [
                     "display": displays.display(containingSpace: key)?.uuid ?? "", "space": key,
-                    "mode": workspace.root.mode == .tabs ? "tabs" : "tiles",
+                    "mode": workspace.root.mode == .accordion ? "accordion" : "tiles",
                     "windows": workspace.windows,
                     "focused": workspace.focused ?? 0,
                     "fullscreen": workspace.fullscreen ?? 0,

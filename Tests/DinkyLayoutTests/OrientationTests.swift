@@ -2,7 +2,7 @@ import CoreGraphics
 import Testing
 @testable import DinkyLayout
 
-/// `auto` orientation, `setOrientation` and tabs preserving orientation.
+/// `auto` orientation, `setOrientation` and accordions turning `auto`.
 struct OrientationTests {
     /// h[1 v[2 3]] in 1000x600: the column on the right is 500x600, taller than wide. 3 is focused.
     func column(autoOrientAccordions: Bool = true) -> Workspace {
@@ -28,43 +28,43 @@ struct OrientationTests {
         #expect(ws.containerAxis(of: 2) == .vertical)
     }
 
-    @Test func `Legacy auto orientation does not rotate tab groups`() {
+    @Test func `A new accordion workspace on a tall display runs top to bottom`() {
         let tall = rect(0, 0, 600, 1000)
-        var ws = Workspace(bounds: tall, autoOrientAccordions: true, algorithm: .dwindle(.tabs))
+        var ws = Workspace(bounds: tall, autoOrientAccordions: true, algorithm: .dwindle(.accordion))
         ws.insert(1)
         ws.insert(2)
-        #expect(shape(ws.root) == "th[1 2]")
-        #expect(ws.containerAxis(of: 2) == .horizontal)
-        #expect(ws.layout().frames[2] == rect(0, 28, 600, 972))
-        var kept = Workspace(bounds: tall, autoOrientAccordions: false, algorithm: .dwindle(.tabs))
+        #expect(shape(ws.root) == "a*[1 2]")
+        #expect(ws.containerAxis(of: 2) == .vertical)
+        #expect(ws.layout().frames[2] == rect(0, 30, 600, 970))
+        var kept = Workspace(bounds: tall, autoOrientAccordions: false, algorithm: .dwindle(.accordion))
         kept.insert(1)
-        #expect(shape(kept.root) == "th[1]", "without auto orientation the root stays horizontal")
+        #expect(shape(kept.root) == "ah[1]", "without auto orientation the root stays horizontal")
         #expect(shape(Workspace(bounds: tall, autoOrientAccordions: true).root) == "h[]", "tiles are unchanged")
     }
 
-    @Test func `Tabs preserve a tall columns orientation`() {
+    @Test func `Accordion in a tall column peeks top and bottom`() {
         var ws = column()
-        ws.setMode(.tabs)
-        #expect(shape(ws.root) == "h[1 tv[2 3]]")
-        #expect(ws.layout().frames[2] == rect(500, 28, 500, 572))
-        #expect(ws.layout().frames[3] == rect(500, 28, 500, 572))
+        ws.setMode(.accordion)
+        #expect(shape(ws.root) == "h[1 a*[2 3]]")
+        #expect(ws.layout().frames[2] == rect(500, 0, 500, 570))
+        #expect(ws.layout().frames[3] == rect(500, 30, 500, 570))
     }
 
-    @Test func `Resizing tabs preserves the containers orientation`() {
+    @Test func `Resizing past square flips an auto accordion`() {
         var ws = column()
-        ws.setMode(.tabs)
+        ws.setMode(.accordion)
         #expect(ws.resize(by: 200) == true)
-        #expect(ws.containerAxis(of: 3) == .vertical)
-        #expect(ws.layout().frames[3] == rect(300, 28, 700, 572))
+        #expect(ws.containerAxis(of: 3) == .horizontal)
+        #expect(ws.layout().frames[3] == rect(330, 0, 670, 600))
     }
 
     @Test func `Auto follows the laid out rect when a minimum holds the column back`() {
         var ws = column()
-        ws.setMode(.tabs)
+        ws.setMode(.accordion)
         ws.minimumSizes = [1: CGSize(width: 450, height: 0)]
         #expect(ws.resize(by: 200) == true)
         #expect(ws.containerAxis(of: 3) == .vertical)
-        #expect(ws.layout().frames[3] == rect(450, 28, 550, 572))
+        #expect(ws.layout().frames[3] == rect(450, 30, 550, 570))
     }
 
     /// h[1 *[2 3]] with 1 held at 450: the column is laid out 550x600, though its ratio alone would make it 700x600.
@@ -84,24 +84,24 @@ struct OrientationTests {
 
     @Test func `Explicit orientation is not changed by layout`() {
         var ws = column(autoOrientAccordions: false)
-        ws.setMode(.tabs)
-        #expect(shape(ws.root) == "h[1 tv[2 3]]")
+        ws.setMode(.accordion)
+        #expect(shape(ws.root) == "h[1 av[2 3]]")
         ws.resize(by: 200)
         #expect(ws.containerAxis(of: 3) == .vertical)
-        #expect(ws.layout().frames[3] == rect(300, 28, 700, 572))
+        #expect(ws.layout().frames[3] == rect(300, 30, 700, 570))
     }
 
-    @Test func `An orientation chosen by command survives the switch to tabs`() {
+    @Test func `An orientation chosen by command survives the switch to accordion`() {
         var ws = column()
         ws.setOrientation(.vertical)
-        ws.setMode(.tabs)
-        #expect(shape(ws.root) == "h[1 tv[2 3]]")
+        ws.setMode(.accordion)
+        #expect(shape(ws.root) == "h[1 av[2 3]]")
     }
 
     @Test func `Mode and orientation together do not merge halfway`() {
         var ws = column()
-        ws.setLayout(.tabs, .horizontal)
-        #expect(shape(ws.root) == "h[1 th[2 3]]")
+        ws.setLayout(.accordion, .horizontal)
+        #expect(shape(ws.root) == "h[1 ah[2 3]]")
     }
 
     @Test func `Setting the parents orientation merges into it`() {

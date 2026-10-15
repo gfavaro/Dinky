@@ -177,13 +177,13 @@ extension Config {
     }
 }
 
-/// Legacy accordion orientation choices, accepted without effect.
+/// Accordion orientation choices.
 public enum AccordionOrientation: String, CaseIterable {
     case auto, keep
 }
 
 public struct Accordion: Equatable {
-    /// Legacy accordion setting, accepted without effect.
+    /// Points by which neighbouring windows peek out.
     public var padding = 30
     public var orientation = AccordionOrientation.auto
 
@@ -247,7 +247,7 @@ public struct FocusFollowsMouse: Equatable {
     public var enabled = false
     /// How long the pointer must rest on a window before it takes focus.
     public var delayMs = 100
-    /// Legacy accordion hover setting, accepted without effect.
+    /// Whether hovering a peeking accordion edge focuses that window.
     public var accordionEdges = true
 
     public init() {}

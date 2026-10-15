@@ -93,7 +93,7 @@ public enum LayoutName: String, Equatable, Sendable {
     public var mode: LayoutMode? {
         switch self {
         case .tiles, .hTiles, .vTiles: .tiles
-        case .tabs, .hTabs, .vTabs, .accordion, .hAccordion, .vAccordion: .tabs
+        case .tabs, .hTabs, .vTabs, .accordion, .hAccordion, .vAccordion: .accordion
         default: nil
         }
     }
@@ -104,10 +104,10 @@ public enum LayoutName: String, Equatable, Sendable {
         let horizontal = axis == .horizontal
         let both: LayoutName = switch mode {
         case .tiles: horizontal ? .hTiles : .vTiles
-        case .tabs: horizontal ? .hTabs : .vTabs
+        case .accordion: horizontal ? .hAccordion : .vAccordion
         }
-        return [mode == .tiles ? .tiles : .tabs, horizontal ? .horizontal : .vertical, both]
-            + (mode == .tabs ? [.accordion, horizontal ? .hAccordion : .vAccordion] : []) + (auto ? [.auto] : [])
+        return [mode == .tiles ? .tiles : .accordion, horizontal ? .horizontal : .vertical, both]
+            + (mode == .accordion ? [.tabs, horizontal ? .hTabs : .vTabs] : []) + (auto ? [.auto] : [])
     }
 
     /// The container orientation this sets, nil if it leaves the orientation alone.

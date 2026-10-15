@@ -16,9 +16,6 @@ final class BorderManager {
     private var borders: [UInt32: BorderWindow] = [:]
     private var focusedID: UInt32 = 0
     private var visibleSpaces: Set<UInt64> = []
-    private var tabFrames: [UInt32: CGRect] = [:]
-    private var suppressedTabs: Set<UInt32> = []
-    private var tabContents: [UInt32: CGRect] = [:]
     /// What the next flush does: check focus, place every border, or place the borders of these windows.
     private var pending = (refocus: false, all: false, ids: Set<UInt32>())
     private var flushScheduled = false
@@ -44,30 +41,6 @@ final class BorderManager {
 
     /// Whether a window id is one of the border windows dinky draws.
     func isBorder(_ id: UInt32) -> Bool { borders.values.contains { $0.id == id } }
-
-    func updateTabGroups(_ layouts: [Layout]) {
-        let frames = layouts.reduce(into: [WindowID: CGRect]()) { $0.merge($1.tabBorderFrames, uniquingKeysWith: { a, _ in a }) }
-        let suppressed = layouts.reduce(into: Set<WindowID>()) { $0.formUnion($1.suppressedTabBorders) }
-        let contents = layouts.reduce(into: [WindowID: CGRect]()) { result, layout in
-            for id in layout.tabBorderFrames.keys { result[id] = layout.frames[id] }
-        }
-        guard frames != tabFrames || contents != tabContents || suppressed != suppressedTabs else { return }
-        // Carry one backing surface with each visible group instead of one per member.
-        for layout in layouts {
-            for group in layout.tabGroups where frames[group.selected] == group.frame && (borders[group.selected]?.id ?? 0) == 0 {
-                if let previous = group.windows.first(where: { borders[$0].map { $0.id != 0 } == true }),
-                   let border = borders.removeValue(forKey: previous) {
-                    border.retarget(group.selected)
-                    borders[group.selected] = border
-                }
-            }
-        }
-        tabFrames = frames
-        tabContents = contents
-        suppressedTabs = suppressed
-        pending.all = true
-        scheduleFlush()
-    }
 
     func handle(_ event: WindowEvent) {
         switch event.kind {
@@ -147,19 +120,10 @@ final class BorderManager {
             borders[window.id]?.hide()
             return
         }
-        if suppressedTabs.contains(window.id) { borders[window.id]?.hide(); return }
-        var decorated = window
-        if let frame = tabFrames[window.id], let content = tabContents[window.id] {
-            // Translate the whole outline with its active window during a native move or resize.
-            decorated.frame = CGRect(x: frame.minX + window.frame.minX - content.minX,
-                                     y: frame.minY + window.frame.minY - content.minY,
-                                     width: max(0, frame.width + window.frame.width - content.width),
-                                     height: max(0, frame.height + window.frame.height - content.height))
-        }
         let focused = window.id == focusedID
         let border = borders[window.id] ?? BorderWindow(target: window.id)
         borders[window.id] = border
-        border.update(decorated, color: focused ? config.activeColor : config.inactiveColor, config: config,
+        border.update(window, color: focused ? config.activeColor : config.inactiveColor, config: config,
                       moveOnly: isAnimating(window.id))
     }
 

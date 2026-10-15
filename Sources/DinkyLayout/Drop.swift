@@ -1,7 +1,7 @@
 import CoreGraphics
 
 public enum DropZone: CaseIterable, Equatable, Sendable {
-    case tabs, left, right, above, below, swap
+    case accordion, left, right, above, below, swap
 
     var direction: Direction? {
         switch self {
@@ -9,7 +9,7 @@ public enum DropZone: CaseIterable, Equatable, Sendable {
         case .right: return .right
         case .above: return .up
         case .below: return .down
-        case .tabs, .swap: return nil
+        case .accordion, .swap: return nil
         }
     }
 }
@@ -35,7 +35,7 @@ public enum DropZones {
                           width: frame.width, height: frame.height - tabHeight)
         let w = body.width / 3, h = body.height / 3
         return [
-            (.tabs, CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: tabHeight)),
+            (.accordion, CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: tabHeight)),
             (.left, CGRect(x: body.minX, y: body.minY, width: w, height: body.height)),
             (.right, CGRect(x: body.maxX - w, y: body.minY, width: w, height: body.height)),
             (.above, CGRect(x: body.minX + w, y: body.minY, width: w, height: h)),
@@ -58,9 +58,9 @@ extension Workspace {
         guard intent.source != intent.target, fullscreen == nil,
               contains(intent.source), contains(intent.target) else { return false }
         var next = self
-        if intent.zone == .tabs, let sourcePath = root.path(of: intent.source), let targetPath = root.path(of: intent.target) {
+        if intent.zone == .accordion, let sourcePath = root.path(of: intent.source), let targetPath = root.path(of: intent.target) {
             let parent = Array(sourcePath.dropLast())
-            if root.container(at: parent).mode == .tabs, targetPath.starts(with: parent) {
+            if root.container(at: parent).mode == .accordion, targetPath.starts(with: parent) {
                 focus(intent.source)
                 return true
             }
@@ -71,22 +71,22 @@ extension Workspace {
             let targetShare = isScrolling ? width(ofColumn: root.path(of: intent.target)![0]) : columnWidth
             next.remove(intent.source)
             guard var path = next.root.path(of: intent.target) else { return false }
-            // Treat an existing tabbed group as one destination allocation.
-            if let depth = path.indices.first(where: { next.root.container(at: Array(path.prefix($0))).mode == .tabs }) {
+            // Treat an existing accordion group as one destination allocation.
+            if let depth = path.indices.first(where: { next.root.container(at: Array(path.prefix($0))).mode == .accordion }) {
                 path = Array(path.prefix(depth))
             }
             if isScrolling, let direction = intent.zone.direction, direction.orientation == .horizontal {
                 let column = next.root.path(of: intent.target)![0]
                 next.root.insert(.window(intent.source), at: column + (direction.isForward ? 1 : 0))
                 next.columnWidths[intent.source] = targetShare
-            } else if intent.zone == .tabs, next.isTabContainer(at: path) {
+            } else if intent.zone == .accordion, next.isAccordionContainer(at: path) {
                 next.root.modify(at: path) { $0.insert(.window(intent.source), at: $0.children.count) }
             } else {
                 let target: Node = path.isEmpty ? .container(next.root) : next.root.node(at: path)
                 let direction = intent.zone.direction
                 let children: [Node] = direction?.isForward == false ? [.window(intent.source), target] : [target, .window(intent.source)]
-                let group = Container(direction.map { ContainerOrientation($0.orientation) } ?? .horizontal,
-                                      intent.zone == .tabs ? .tabs : .tiles, children)
+                let group = Container(direction.map { ContainerOrientation($0.orientation) } ?? (autoOrientAccordions ? .auto : .horizontal),
+                                      intent.zone == .accordion ? .accordion : .tiles, children)
                 if path.isEmpty { next.root = group }
                 else { next.root.modify(at: Array(path.dropLast())) { $0.replace(at: path.last!, with: .container(group)) } }
             }
@@ -100,9 +100,18 @@ extension Workspace {
         return true
     }
 
-    private func isTabContainer(at path: [Int]) -> Bool {
-        if path.isEmpty { return root.mode == .tabs }
-        if case .container(let c) = root.node(at: path) { return c.mode == .tabs }
+    /// The outer accordion is one drop destination, including its peeking edges.
+    public func dropFrame(for id: WindowID, in layout: Layout) -> CGRect? {
+        guard let path = root.path(of: id) else { return nil }
+        if let depth = path.indices.first(where: { root.container(at: Array(path.prefix($0))).mode == .accordion }) {
+            return layout.containerRects[Array(path.prefix(depth))]
+        }
+        return layout.frames[id]
+    }
+
+    private func isAccordionContainer(at path: [Int]) -> Bool {
+        if path.isEmpty { return root.mode == .accordion }
+        if case .container(let c) = root.node(at: path) { return c.mode == .accordion }
         return false
     }
 }

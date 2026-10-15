@@ -2,21 +2,12 @@
 
 ## Unreleased
 
-### Added
+### Layout and dragging
 
-- Set `[drag] drop-targets = true` to choose Tabs, Left, Right, Above, Below, or Swap while dragging a tiled window. The existing tile, fixed, and scrolling layouts remain available. Drop targets are off by default.
-- Drag a tab horizontally to reorder it, or pull it out of the strip to place its window in another layout. Tab strips show app icons, window titles, and a close button on hover. Each group uses the configured Dinky border.
-
-### Changed
-
-- Tabs replace accordion stacking. Members share a content frame below a 28-point tab strip. The `accordion`, `h_accordion`, and `v_accordion` commands remain aliases; old accordion appearance settings still load but have no effect. `list-windows` reports `h_tabs` or `v_tabs` for these groups.
-
-### Fixed
-
-- Tab widths follow title length and stay within 112–320 points. Crowded groups scroll, and selecting a tab brings it into view. Tab drags show an insertion marker above the strip.
-- Tab shells allocate only the strip and top-corner area. Hidden borders release their graphics surfaces, and switching tabs reuses the group border. Drag previews release their surfaces when the drag ends or is cancelled.
-- Repeated title events share one pending Accessibility read and one follow-up read. Requests for groups that disappear are skipped before the read starts.
-- Release a tracked window from its layout if it becomes a panel or leaves the normal window layer. Hidden document windows retain their classification.
+- Restore accordion stacking with peeking edges, configurable padding and automatic orientation. Remove tab strips, close controls and the tab-title cache.
+- Existing `tabs` commands, configuration spellings and saved layouts load as accordion. The menu and window-layout reports use accordion names.
+- Drag targets offer Accordion, Left, Right, Above, Below and Swap. Fixed cells, manual scrolling widths and saved layout ratios remain available.
+- Hidden borders and completed drag previews release their graphics surfaces. Normal document windows retain their classification while hidden.
 
 ### Restoration
 

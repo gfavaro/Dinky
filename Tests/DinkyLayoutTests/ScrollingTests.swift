@@ -214,12 +214,12 @@ struct ScrollingCommandTests {
 
     @Test func `Layout commands leave the strip alone`() {
         var ws = strip(2)
-        ws.setMode(.tabs)
+        ws.setMode(.accordion)
         ws.setOrientation(.vertical)
         #expect(shape(ws.root) == "h[1 2]")
         ws.join(.left)
-        ws.setMode(.tabs)
-        #expect(shape(ws.root) == "h[tv[1 2]]")
+        ws.setMode(.accordion)
+        #expect(shape(ws.root) == "h[av[1 2]]")
     }
 
     @Test func `Switching to scrolling keeps the windows in order`() {

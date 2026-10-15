@@ -80,7 +80,7 @@
     "accordion": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Legacy accordion settings, accepted without effect. Accordion layouts now use tabs.",
+      "description": "Accordion padding and orientation settings.",
       "properties": {
         "padding": {
           "type": "integer",

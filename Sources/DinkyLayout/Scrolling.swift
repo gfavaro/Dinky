@@ -104,7 +104,6 @@ extension Workspace {
             case .window(let id):
                 result.frames[id] = rect
                 result.order.append(id)
-                result.visibleWindows.insert(id)
             case .container(let c):
                 c.layout(in: rect, gaps: gaps, padding: accordionPadding, minimums: minimumSizes, path: [i], into: &result)
             }

@@ -20,7 +20,7 @@ final class Coordinator {
     let model = WindowModel()
     var enabled = true {
         didSet {
-            if !enabled { cancelDrag(); dragEvents.stop(); tabBars.hide(); borders?.updateTabGroups([]); applier.cancel(); animator.cancel() }
+            if !enabled { cancelDrag(); dragEvents.stop(); applier.cancel(); animator.cancel() }
             if enabled, !oldValue { startDragEvents(); reconcile() }
         }
     }
@@ -53,13 +53,9 @@ final class Coordinator {
     var dragSession: DragSession?
     var dragPointer: CGPoint?
     let dropOverlay = DropOverlay()
-    let tabBars = TabBars()
-    let tabDragProxy = TabDragProxy()
-    let tabCloser = TabCloser()
-    var tabBarsDirty = true
     var cancelledDragSpace: UInt64?
     func isLayoutPanel(_ id: WindowID) -> Bool {
-        isBorderWindow(id) || tabDragProxy.contains(id) || tabBars.contains(id) || dropOverlay.contains(id) || placeholders.contains(id)
+        isBorderWindow(id) || dropOverlay.contains(id) || placeholders.contains(id)
     }
     /// Called when the focused window changes.
     var onFocusChange: (() -> Void)?
@@ -81,35 +77,6 @@ final class Coordinator {
     func start(beforeTiling: () -> Void = {}) {
         model.observe { [weak self] event in self?.handle(event) }
         startDragEvents()
-        tabBars.select = { [weak self] id in
-            guard let self, self.enabled, let key = self.placements[id]?.space, self.isVisible(key) else { return }
-            self.edit(key) { $0.focus(id) }
-            self.focus(id)
-            self.flush()
-        }
-        tabBars.close = { [weak self] id in
-            guard let self, self.enabled, let key = self.placements[id]?.space, self.isVisible(key),
-                  let window = self.model.windows[id], self.workspaces[key]?.contains(id) == true else { return }
-            self.tabCloser.close(window) { [weak self] in
-                guard let self else { return false }
-                return self.enabled && self.model.windows[id]?.identity == window.identity
-                    && self.placements[id]?.space == key && self.isVisible(key)
-            }
-        }
-        tabBars.titles.changed = { [weak self] in
-            guard let self, self.enabled else { return }
-            self.tabBars.invalidateTitles()
-            self.tabBarsDirty = true
-            self.flush()
-        }
-        tabBars.reorder = { [weak self] id, index, members in
-            guard let self, self.enabled, let key = self.placements[id]?.space, self.isVisible(key) else { return }
-            self.edit(key) { $0.reorderTab(id, to: index, members: members) }
-            self.focus(id)
-            self.flush()
-        }
-        tabBars.drag = { [weak self] id, point, title in self?.dragTab(id, at: point, title: title) }
-        tabBars.finishDrag = { [weak self] point in self?.finishTabDrag(at: point) }
         animator.onArrive = { [weak self] ids in self?.borders?.arrived(ids) }
         var known = Set(displays.displays.map(\.uuid))
         displays.observe { [weak self] displays in
@@ -140,7 +107,6 @@ final class Coordinator {
 
     func update(config: Config) {
         cancelDrag()
-        tabBarsDirty = true
         self.config = config
         animator.setDuration(ms: config.animations.durationMs)
         if config.borders.enabled {
@@ -176,8 +142,7 @@ final class Coordinator {
         if MissionControl.shared.update(from: model) { borders?.missionControlChanged() }
         borders?.handle(event)
         if [.spaceChange, .spaceCreated, .spaceDestroyed].contains(event.kind) { cancelDrag() }
-        if MissionControl.shared.active { cancelDrag(); tabBars.hide() }
-        if event.kind == .windowTitle { tabBars.invalidateTitles(event.window?.id); tabBarsDirty = true }
+        if MissionControl.shared.active { cancelDrag() }
         if let window = event.window {
             event.change == .removed ? forget(window.id) : track(window)
             if [.windowMove, .windowResize].contains(event.kind) { noteFrameChange(of: window.id) }
@@ -201,7 +166,6 @@ final class Coordinator {
     /// publishes every window it re-reads, so `handle` tracks and forgets them. Empty trees of Spaces that
     /// no longer exist are dropped.
     func reconcile() {
-        tabBarsDirty = true
         configureWorkspaces()
         model.reconcile()
         fitToDisplays()
@@ -279,11 +243,11 @@ final class Coordinator {
         let expand: FixedExpansion = switch settings.expand {
         case .rows: .rows
         case .columns: .columns
-        case .tabs, .accordion: .tabs
+        case .tabs, .accordion: .accordion
         }
         return switch settings.layout {
         case .tiles, .dwindle: .dwindle(.tiles)
-        case .tabs, .accordion: .dwindle(.tabs)
+        case .tabs, .accordion: .dwindle(.accordion)
         case .fixed: .fixed(rows: settings.rows, columns: settings.columns, expand: expand)
         case .scrolling: .scrolling
         }
@@ -364,7 +328,6 @@ final class Coordinator {
             // Before the override goes: a new window can take focus before it shows. See Adoption.swift.
             displayBeforeFocus = displays.focusedDisplay(window: lastFocused)?.uuid
             lastFocused = id
-            tabBarsDirty = true
             // Only a window takes focus from a display focused without one, not an app with no window here.
             if id != 0 { displays.focusOverride = nil }
             onFocusChange?()
@@ -402,7 +365,7 @@ final class Coordinator {
         let result = change(&workspace)
         workspaces[key] = workspace
         if WorkspaceSnapshot(workspace) != saved { session.saveSoon() }
-        if workspace.layout() != before { dirty.insert(key); tabBarsDirty = true }
+        if workspace.layout() != before { dirty.insert(key) }
         return result
     }
 
@@ -419,13 +382,6 @@ final class Coordinator {
             if dragSession?.space == key { dirty.insert(key); continue }
             apply(key)
         }
-        if MissionControl.shared.active { tabBars.hide(); tabBarsDirty = true }
-        else if tabBarsDirty {
-            tabBarsDirty = false
-            let layouts = workspaces.filter { isVisible($0.key) }.map { (space: $0.key, layout: $0.value.layout()) }
-            borders?.updateTabGroups(layouts.map(\.layout))
-            tabBars.update(layouts, model: model)
-        }
     }
 
     /// Restore trees before their first frame write. Inactive Spaces are restored on their first ordinary visit.
@@ -440,7 +396,6 @@ final class Coordinator {
                 workspaces[key] = workspace
                 snap.insert(key)
                 dirty.insert(key)
-                tabBarsDirty = true
                 session.saveSoon()
             }
         }
@@ -468,7 +423,6 @@ final class Coordinator {
     /// focus it themselves, so a pass, which may have started before the latest focus change, must not.
     /// Minimum sizes found in a pass are laid out around all at once, when that moves anything.
     private func apply(_ key: UInt64) {
-        tabBarsDirty = true
         guard var workspace = workspaces[key] else { return }
         workspace.minimumSizes = minimumSizes(in: workspace)
         workspaces[key] = workspace

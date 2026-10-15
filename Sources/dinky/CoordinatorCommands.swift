@@ -52,7 +52,7 @@ extension Coordinator {
         guard let key = placements[id]?.space, let workspace = workspaces[key],
               let container = workspace.container(of: id), let axis = workspace.containerAxis(of: id) else { return "floating" }
         if workspace.fullscreen == id { return "fullscreen" }
-        return (axis == .horizontal ? "h_" : "v_") + (container.mode == .tabs ? "tabs" : "tiles")
+        return (axis == .horizontal ? "h_" : "v_") + (container.mode == .accordion ? "tabs" : "tiles")
     }
 
     /// Runs a command on the tree of a window (the focused one by default), focused in that tree, and applies

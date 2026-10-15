@@ -49,7 +49,7 @@ private final class DropOverlayView: NSView {
             let symbol: String
             let label: String
             switch item.zone {
-            case .tabs: (symbol, label) = ("rectangle.3.group", "Tabs")
+            case .accordion: (symbol, label) = ("rectangle.3.group", "Accordion")
             case .left: (symbol, label) = ("arrow.left", "Left")
             case .right: (symbol, label) = ("arrow.right", "Right")
             case .above: (symbol, label) = ("arrow.up", "Above")

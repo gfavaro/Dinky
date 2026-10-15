@@ -5,7 +5,6 @@ struct DragSession {
     let identity: Window.Identity
     let space: UInt64
     let layout: Layout
-    var fromTabStrip = false
     var intent: DropIntent?
     var targetIdentity: Window.Identity?
 }
@@ -15,36 +14,16 @@ extension Coordinator {
         dragEvents.onEvent = { [weak self] type, pointer, keyCode in
             guard let self else { return }
             self.dragPointer = pointer
-            if type == .keyDown, keyCode == 53 { self.tabBars.cancelGesture(); self.cancelDrag(); return }
+            if type == .keyDown, keyCode == 53 { self.cancelDrag(); return }
             if type == .leftMouseUp { self.finishDrag(); return }
             if type == .leftMouseDragged { self.showPlaceholders() }
         }
         dragEvents.start()
     }
 
-    func dragTab(_ id: WindowID, at point: CGPoint, title: String) {
-        guard enabled, !MissionControl.shared.active, dragEvents.available, !dragEvents.suppressed,
-              let key = placements[id]?.space, isVisible(key), let window = model.windows[id],
-              let workspace = workspaces[key], workspace.fullscreen == nil else { return }
-        if dragSession == nil {
-            dragging = id
-            dragSession = DragSession(identity: window.identity, space: key, layout: workspace.layout(), fromTabStrip: true)
-        }
-        guard dragSession?.identity == window.identity, dragSession?.fromTabStrip == true else { return }
-        dragPointer = point
-        showPlaceholders()
-        tabDragProxy.show(title: title, at: point, space: key, above: dropOverlay.windowID ?? id)
-    }
-
-    func finishTabDrag(at point: CGPoint) {
-        guard dragSession?.fromTabStrip == true else { return }
-        dragPointer = point
-        finishDrag()
-    }
-
     func noteFrameChange(of id: WindowID) {
         if dragging == id { return showPlaceholders() }
-        guard enabled, !MissionControl.shared.active, dragging == nil, !tabBars.isInteracting, dragEvents.available,
+        guard enabled, !MissionControl.shared.active, dragging == nil, dragEvents.available,
               !dragEvents.suppressed, mouseButtonDown, !isAnimating(id),
               let key = placements[id]?.space, isVisible(key), let window = model.windows[id],
               let layout = workspaces[key]?.layout(), let home = layout.frames[id],
@@ -59,8 +38,6 @@ extension Coordinator {
         guard let session = dragSession else { return }
         dragging = nil
         dragSession = nil
-        tabBars.cancelGesture()
-        tabDragProxy.hide()
         placeholders.hide(release: true)
         dropOverlay.hide(release: true)
         dragEvents.suppressUntilRelease()
@@ -81,17 +58,13 @@ extension Coordinator {
         guard let final = dragSession else { return }
         dragging = nil
         dragSession = nil
-        tabBars.cancelGesture()
-        tabDragProxy.hide()
         placeholders.hide(release: true)
         dropOverlay.hide(release: true)
         guard enabled, model.windows[session.identity.id]?.identity == session.identity,
               placements[session.identity.id]?.space == session.space, isVisible(session.space),
               let window = model.windows[session.identity.id], let expected = session.layout.frames[window.id] else { return }
         let frame = liveFrame(window.id) ?? window.frame
-        if session.fromTabStrip {
-            if commitDrop(final) { focus(window.id) }
-        } else if !frame.isClose(to: expected, within: 2) {
+        if !frame.isClose(to: expected, within: 2) {
             if let edges = movedEdges(from: expected, to: frame) {
                 edit(session.space) { $0.resize(window.id, to: frame.size, moving: edges) }
             } else { _ = commitDrop(final) }
@@ -115,19 +88,16 @@ extension Coordinator {
         session.targetIdentity = nil
         let home = session.layout.frames[id]!
         let currentFrame = frame ?? window.frame
-        guard session.fromTabStrip || (!currentFrame.isClose(to: home, within: 2) && movedEdges(from: home, to: currentFrame) == nil),
+        guard !currentFrame.isClose(to: home, within: 2), movedEdges(from: home, to: currentFrame) == nil,
               let pointer = dragPointer else {
             dragSession = session
             placeholders.hide()
             dropOverlay.hide()
             return
         }
-        // Dragging the selected tab must expose its remaining group as a destination too.
-        let remainingTab = session.layout.tabGroups.first { $0.selected == id }?.tabs.first { $0 != id }
         let target = session.layout.order.first { other in
-            guard other != id, session.layout.visibleWindows.contains(other) || remainingTab == other,
-                  placements[other]?.space == session.space, model.windows[other] != nil else { return false }
-            return destinationFrame(other, in: session.layout)?.contains(pointer) == true
+            guard other != id, placements[other]?.space == session.space, model.windows[other] != nil else { return false }
+            return session.layout.frames[other]?.contains(pointer) == true
         }
         let targetFrame = target.flatMap { destinationFrame($0, in: session.layout) }
         if let target, let targetFrame {
@@ -147,7 +117,7 @@ extension Coordinator {
     }
 
     private func destinationFrame(_ id: WindowID, in layout: Layout) -> CGRect? {
-        layout.tabGroups.first { $0.windows.contains(id) }?.frame ?? layout.frames[id]
+        dragSession.flatMap { workspaces[$0.space]?.dropFrame(for: id, in: layout) }
     }
 
     private func liveFrame(_ id: WindowID) -> CGRect? {

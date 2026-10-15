@@ -19,14 +19,11 @@ public enum ContainerOrientation: Equatable, Sendable, Codable {
     public init(_ axis: Orientation) { self = axis == .horizontal ? .horizontal : .vertical }
 }
 
-/// How a container shows its children: side by side, or as a tabbed group.
+/// How a container shows its children: side by side, or stacked with neighbours peeking out.
 public enum LayoutMode: Equatable, Sendable, Codable {
-    case tiles, tabs
+    case tiles, accordion
 
-    /// Source compatibility: accordion now displays tabs.
-    public static let accordion = LayoutMode.tabs
-
-    private enum CodingKeys: String, CodingKey { case tiles, tabs, accordion }
+    private enum CodingKeys: String, CodingKey { case tiles, accordion, tabs }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -35,8 +32,8 @@ public enum LayoutMode: Equatable, Sendable, Codable {
         }
         switch key {
         case .tiles: self = .tiles
-        case .tabs: self = .tabs
-        case .accordion: self = .tabs
+        case .accordion: self = .accordion
+        case .tabs: self = .accordion
         }
     }
 
@@ -45,9 +42,8 @@ public enum LayoutMode: Equatable, Sendable, Codable {
         let key: CodingKeys
         switch self {
         case .tiles: key = .tiles
-        case .tabs: key = .accordion
+        case .accordion: key = .accordion
         }
-        // Keep the legacy spelling so standalone restoration builds can read this journal.
         _ = container.nestedContainer(keyedBy: CodingKeys.self, forKey: key)
     }
 }
@@ -89,11 +85,11 @@ public indirect enum Node: Equatable, Sendable, Codable {
 public struct Container: Equatable, Sendable, Codable {
     public var orientation: ContainerOrientation
     public var mode: LayoutMode
-    /// Whether a `layout` command chose the orientation, so switching to tabs keeps it.
+    /// Whether a `layout` command chose the orientation, so switching to accordion keeps it.
     public var orientationChosen = false
     public private(set) var children: [Node] = []
     public private(set) var ratios: [Double] = []
-    /// Index of the most recently focused child. Selects the visible tab.
+    /// Index of the most recently focused child. Drives accordion stacking.
     public internal(set) var active = 0
 
     /// A container with the given children, if any, and equal ratios.
@@ -128,13 +124,6 @@ public struct Container: Equatable, Sendable, Codable {
     /// Replace the child at `index`, keeping its ratio.
     mutating func replace(at index: Int, with node: Node) {
         children[index] = node
-    }
-
-    /// Reorder a child without changing its saved share.
-    mutating func reorder(from: Int, to: Int) {
-        let node = children.remove(at: from), ratio = ratios.remove(at: from)
-        children.insert(node, at: to)
-        ratios.insert(ratio, at: to)
     }
 
     /// Set all ratios at once. Callers keep them summing to 1.

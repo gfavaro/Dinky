@@ -107,11 +107,11 @@ struct ResizeToTests {
         #expect(abs(frame.maxY - 590) <= 1)
     }
 
-    @Test func `Tab member resizes its group`() {
+    @Test func `Accordion child resizes its accordion`() {
         var ws = workspace(3) // h[1 v[2 3]]
         ws.focus(2)
-        ws.setMode(.tabs)
-        #expect(shape(ws.root) == "h[1 tv[2 3]]")
+        ws.setMode(.accordion)
+        #expect(shape(ws.root) == "h[1 av[2 3]]")
         #expect(ws.resize(2, to: CGSize(width: 600, height: 570), moving: [.left]) == true)
         assertRatios(ws.root.ratios, [0.4, 0.6])
         #expect(ws.layout().frames[3]?.width == 600)
