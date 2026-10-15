@@ -23,7 +23,7 @@ struct ConfigTests {
         #expect(config.rules.count == 1)
         #expect(config.rules[0].appId == "com.apple.systempreferences")
         #expect(config.rules[0].run == ["layout floating"])
-        #expect(Set(config.modes.keys) == ["main", "service"])
+        #expect(Set(config.modes.keys) == ["main", "service", "join"])
         let main = config.modes["main"]!.bindings
         #expect(try main[KeyCombo("ctrl-left")] == ["workspace prev"])
         #expect(try main[KeyCombo("alt-9")] == ["workspace 9"])
@@ -31,7 +31,7 @@ struct ConfigTests {
         #expect(try main[KeyCombo("alt-k")] == ["focus up"])
         #expect(try main[KeyCombo("alt-shift-l")] == ["move right"])
         #expect(try main[KeyCombo("alt-shift-semicolon")] == ["mode service"])
-        #expect(main.count == 37)
+        #expect(main.count == 38)
         #expect(try config.modes["service"]!.bindings[KeyCombo("esc")] == ["reload-config", "mode main"])
         #expect(try config.modes["service"]!.bindings[KeyCombo("alt-shift-j")] == ["join-with down", "mode main"])
     }

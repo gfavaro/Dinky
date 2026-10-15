@@ -4,6 +4,8 @@
 
 ### Menu bar
 
+- Add join mode: Option-Shift-G enters it, H/J/K/L or arrows join windows into tiled groups, and Escape returns to main. Existing configs need the new bindings; service-mode joins still work.
+
 - Show a non-main binding mode before the Space number, like `(S) 3` for service. Main shows only `3`. Mode changes update the label immediately; hover or VoiceOver gives the full mode name.
 
 ### Layout and dragging

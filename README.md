@@ -4,7 +4,7 @@ DinkyWinky is a personal fork of [Dinky](https://github.com/mikker/Dinky) with d
 
 Build the local signed bundle with `IDENTITY='WinMuxX Local Code Signing' scripts/bundle.sh`. It produces `build/DinkyWinky.app`; the bundled CLI is `Contents/MacOS/dinkywinky`. The app uses `~/.config/dinkywinky/dinkywinky.toml`, `~/Library/Application Support/dinkywinky`, `~/Library/Logs/dinkywinky.log`, and its own temporary command socket. Its bundle identifier is `com.gfavaro.DinkyWinky`. The upstream automatic update feed is disabled for this build.
 
-The menu-bar label shows the focused Space. Outside the main binding mode, it adds the uppercase first character, like `(S) 3` for service. Hover for the full mode name.
+The menu-bar label shows the focused Space. Outside the main binding mode, it adds the uppercase first character, like `(S) 3` for service. Hover for the full mode name. Option-Shift-G enters join mode: H/J/K/L or arrows join windows into tiled groups, and Escape returns to main.
 
 Dinky and DinkyWinky can both be installed. Quit one before running the other. Comparison builds use separate saved state; copying the initial config does not synchronize later changes. DinkyWinky needs its own Accessibility grant. Use the local bundle workflow for this fork; upstream release and VM scripts retain their original Dinky packaging and credentials.
 

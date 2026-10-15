@@ -452,6 +452,7 @@ alt-comma = 'layout accordion'
 alt-slash = 'layout tiles'
 alt-shift-n = 'move-window-to-display next'
 alt-shift-semicolon = 'mode service'
+alt-shift-g = 'mode join'
 
 [mode.service]
 esc = ['reload-config', 'mode main']
@@ -460,7 +461,28 @@ alt-shift-h = ['join-with left', 'mode main']
 alt-shift-j = ['join-with down', 'mode main']
 alt-shift-k = ['join-with up', 'mode main']
 alt-shift-l = ['join-with right', 'mode main']
+
+[mode.join]
+esc = 'mode main'
+h = 'join-with left'
+j = 'join-with down'
+k = 'join-with up'
+l = 'join-with right'
+left = 'join-with left'
+down = 'join-with down'
+up = 'join-with up'
+right = 'join-with right'
+
 ```
 
 The former `tabs`, `h_tabs` and `v_tabs` commands, and `tabs` layout/expansion
 settings, load as accordion for compatibility. They do not create tab strips.
+
+## Join mode
+
+Press Option-Shift-G to enter join mode. H/J/K/L or the arrow keys run
+`join-with left/down/up/right`. The mode stays active so you can join more
+windows; Escape returns to main. The menu bar shows `(J)` while join mode is
+active. Joining uses the existing tiled-group behavior. To add this mode to an
+existing config, copy the `[mode.join]` bindings and its main-mode shortcut
+from the shipped config. Existing service-mode shortcuts remain available.
