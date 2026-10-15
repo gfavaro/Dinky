@@ -11,8 +11,12 @@ final class HotkeyEngine {
     private var sides = ModifierSides()
     private(set) var currentMode = "main"
     var enabled = true
-    /// Called with the new mode's name and the previous one whenever the mode changes.
-    var onModeChange: ((_ mode: String, _ previous: String) -> Void)?
+    private var modeObservers: [(_ mode: String, _ previous: String) -> Void] = []
+
+    /// Observers live with the engine and receive actual changes in registration order.
+    func observeModeChange(_ observer: @escaping (_ mode: String, _ previous: String) -> Void) {
+        modeObservers.append(observer)
+    }
     private var tap: CFMachPort?
 
     /// `onCommands` is called on the main queue with the binding's commands, in order.
@@ -41,7 +45,7 @@ final class HotkeyEngine {
         guard name != currentMode else { return }
         let previous = currentMode
         currentMode = name
-        onModeChange?(name, previous)
+        for observer in modeObservers { observer(name, previous) }
     }
 
     /// Creates the tap on the current run loop. False if it could not (Accessibility missing).

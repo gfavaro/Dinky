@@ -54,6 +54,7 @@ final class DinkyApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.button?.font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .bold)
         statusItem.menu = NSMenu()
         statusItem.menu?.delegate = self
+        AppState.shared.hotkeys.observeModeChange { [weak self] _, _ in self?.refreshLabel() }
         _ = AppState.shared.hotkeys.start()
         // First, so the follower sees every Space change from here on, the first arrangement's included.
         installActivationFollower()
@@ -71,15 +72,22 @@ final class DinkyApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func refresh() {
-        let state = AppState.shared
-        let workspace = state.displays.focusedDisplay().flatMap(state.numbers.current(on:))
         let tilers = runningOtherTilers()
         if tilers != otherTilers {
             otherTilers = tilers
             if !tilers.isEmpty { print("app: \(otherTilersWarning(tilers))") }
         }
-        let trouble = state.configError != nil || !otherTilers.isEmpty
-        statusItem.button?.title = (workspace.map { "\($0)" } ?? "?") + (trouble ? "!" : "")
+        refreshLabel()
+    }
+
+    private func refreshLabel() {
+        let state = AppState.shared
+        let workspace = state.displays.focusedDisplay().flatMap(state.numbers.current(on:))
+        let label = MenuBarStatus(workspace: workspace, mode: state.hotkeys.currentMode,
+                                  warning: state.configError != nil || !otherTilers.isEmpty, enabled: state.enabled)
+        statusItem.button?.title = label.title
+        statusItem.button?.toolTip = label.description
+        statusItem.button?.setAccessibilityLabel(label.description)
         statusItem.button?.appearsDisabled = !state.enabled
     }
 

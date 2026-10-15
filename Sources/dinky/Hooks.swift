@@ -19,7 +19,7 @@ final class Hooks {
         SpaceSwitcher.shared.onTarget = { [weak self] uuid, target in self?.switchTargeted(uuid, target) }
         SpaceSwitcher.shared.onGiveUp = { [weak self] uuid in self?.switchGaveUp(uuid) }
         state.coordinator?.onFocusChange = { [weak self] in self?.focusChanged() }
-        state.hotkeys.onModeChange = { mode, previous in
+        state.hotkeys.observeModeChange { mode, previous in
             run(AppState.shared.config.hooks.modeChanged, env: ["DINKY_MODE": mode, "DINKY_PREV_MODE": previous])
         }
         run(state.config.hooks.startup)

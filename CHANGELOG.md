@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Menu bar
+
+- Show a non-main binding mode before the Space number, like `(S) 3` for service. Main shows only `3`. Mode changes update the label immediately; hover or VoiceOver gives the full mode name.
+
 ### Layout and dragging
 
 - Restore accordion stacking with peeking edges, configurable padding and automatic orientation. Remove tab strips, close controls and the tab-title cache.
